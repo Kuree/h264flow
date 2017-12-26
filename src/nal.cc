@@ -3,10 +3,7 @@
 //
 
 #include "nal.hh"
-#include "io.hh"
 #include "util.hh"
-#include <memory>
-#include <sstream>
 #include <sstream>
 
 using std::shared_ptr;
@@ -34,11 +31,11 @@ void NALUnit::decode_header(BinaryReader & br) {
     if (tmp & 0x80)
         throw std::runtime_error("forbidden 0 bit is set");
     _nal_ref_idc = tmp >> 5;
-    _nal_unit_type = tmp & 0x1F;
+    _nal_unit_type = static_cast<uint8_t >(tmp & 0x1F);
 }
 
 
-SPS_NALUnit::SPS_NALUnit(std::string data) : NALUnit(data),
+SPS_NALUnit::SPS_NALUnit(std::string data) : NALUnit(std::move(data)),
                                              _offset_for_ref_frame() {
     parse();
 }
@@ -59,7 +56,7 @@ void SPS_NALUnit::parse() {
         if (_chroma_format_idc == 3)
             _separate_colour_plane_flag = br.read_bit(); /* 3 -> 4:4:4 */
         else
-            _separate_colour_plane_flag = 0; /* 1->4:2:0    2-> 4:2:2 */
+            _separate_colour_plane_flag = false; /* 1->4:2:0    2-> 4:2:2 */
 
     }
     _bit_depth_luma_minus8 = br.read_ue();
@@ -107,7 +104,7 @@ SPS_NALUnit::SPS_NALUnit(NALUnit & unit) : NALUnit(unit),
     parse();
 }
 
-PPS_NALUnit::PPS_NALUnit(std::string data) : NALUnit(data), _run_length_minus1(),
+PPS_NALUnit::PPS_NALUnit(std::string data) : NALUnit(std::move(data)), _run_length_minus1(),
                                              _top_left(), _bottom_right(),
                                              _slice_group_id(){
     parse();
@@ -166,7 +163,7 @@ void PPS_NALUnit::parse() {
 
 }
 
-Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(data),
+Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)),
                                                  _header(*this, _data) {
 
 }
@@ -175,7 +172,7 @@ Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit),
                                               _header(*this, _data) {}
 void Slice_NALUnit::parse(std::shared_ptr<SPS_NALUnit> sps,
                           std::shared_ptr<PPS_NALUnit> pps) {
-    _header.parse(sps, pps);
+    _header.parse(std::move(sps), std::move(pps));
 }
 
 void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
@@ -198,7 +195,7 @@ void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
     }
     if (_nal.idr_pic_flag())
         idr_pic_id = br.read_ue();
-    if (sps->frame_mbs_only_flag())
+    if (sps->pic_order_cnt_type() == 0)
         pic_order_cnt_lsb = br.read_bits(
                 sps->log2_max_pic_order_cnt_lsb_minus4() + 4);
     if (pps->bottom_field_pic_order_in_frame_present_flag() && !field_pic_flag )
@@ -212,7 +209,7 @@ void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
     }
     if (pps->redundant_pic_cnt_present_flag())
         redundant_pic_cnt = br.read_ue();
-    if (slice_type == SliceType::TYPE_P)
+    if (slice_type == SliceType::TYPE_B)
         direct_spatial_mv_pred_flag = br.read_bit_as_bool();
     if ((slice_type == SliceType::TYPE_P) || (slice_type == SliceType::TYPE_SP)
         ||  (slice_type == SliceType::TYPE_B)) {
@@ -230,10 +227,10 @@ void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
     rplm = RefPicListModification(slice_type, br);
     if ((pps->weighted_pred_flag() && (slice_type == SliceType::TYPE_P ||
             slice_type == SliceType::TYPE_SP)) ||
-            (pps->weighted_bipred_idc() && (slice_type == SliceType::TYPE_B))) {
-        pwt = PredWeightTable(sps, pps, br);
+            (pps->weighted_bipred_idc() == 1
+             && (slice_type == SliceType::TYPE_B))) {
+        pwt = PredWeightTable(sps, pps, slice_type, br);
     }
-
     if (_nal.nal_ref_idc())
         drpm = DecRefPicMarking(_nal, br);
     if (pps->entropy_coding_mode_flag() && slice_type != SliceType::TYPE_I &&
@@ -261,32 +258,47 @@ void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
         slice_group_change_cycle = br.read_bits(bits);
     }
 
-
     _header_size = br.pos();
 }
 
 RefPicListModification::RefPicListModification()
         : modification_of_pic_nums_idc(), abs_diff_pic_num_minus1(),
-          long_term_pic_num() {}
+          long_term_pic_num(), abs_diff_view_idx_minus1() {}
 
 RefPicListModification::RefPicListModification(uint64_t slice_type,
                                                BinaryReader &br)
         :RefPicListModification() {
-    if (slice_type % 5 != 2 && slice_type % 5 != 4)
+    if (slice_type % 5 != 2 && slice_type % 5 != 4) {
         ref_pic_list_modification_flag_l0 = br.read_bit_as_bool();
-    if (slice_type % 5 == 1)
+        if (ref_pic_list_modification_flag_l0) {
+            uint64_t mod = 0;
+            do {
+                mod = br.read_ue();
+                modification_of_pic_nums_idc.emplace_back(mod);
+                if (mod == 0 || mod == 1)
+                    abs_diff_pic_num_minus1.emplace_back(br.read_ue());
+                else if (mod == 2)
+                    long_term_pic_num.emplace_back(br.read_ue());
+                else if (mod == 4 || mod == 5)
+                    abs_diff_view_idx_minus1.emplace_back(br.read_ue());
+            } while (mod != 3);
+        }
+    }
+    if (slice_type % 5 == 1) {
         ref_pic_list_modification_flag_l1 = br.read_bit_as_bool();
-    if (ref_pic_list_modification_flag_l0
-        || ref_pic_list_modification_flag_l1) {
-        uint64_t mod = 0;
-        do {
-            mod = br.read_ue();
-            modification_of_pic_nums_idc.emplace_back(mod);
-            if (mod == 0 || mod == 1)
-                abs_diff_pic_num_minus1.emplace_back(br.read_ue());
-            else if (mod == 2)
-                long_term_pic_num.emplace_back(br.read_ue());
-        } while(mod != 3);
+        if (ref_pic_list_modification_flag_l1) {
+            uint64_t mod = 0;
+            do {
+                mod = br.read_ue();
+                modification_of_pic_nums_idc.emplace_back(mod);
+                if (mod == 0 || mod == 1)
+                    abs_diff_pic_num_minus1.emplace_back(br.read_ue());
+                else if (mod == 2)
+                    long_term_pic_num.emplace_back(br.read_ue());
+                else if (mod == 4 || mod == 5)
+                    abs_diff_view_idx_minus1.emplace_back(br.read_ue());
+            } while (mod != 3);
+        }
     }
 }
 
@@ -295,8 +307,9 @@ PredWeightTable::PredWeightTable() : luma_weight_l0(), luma_offset_l0(),
                                      chroma_weight_l0(), chroma_offset_l0(),
                                      chroma_weight_l1(), chroma_offset_l1() {}
 
-PredWeightTable::PredWeightTable(const std::shared_ptr<SPS_NALUnit> sps,
-                                 const std::shared_ptr<PPS_NALUnit> pps,
+PredWeightTable::PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
+                                 std::shared_ptr<PPS_NALUnit> pps,
+                                 uint64_t slice_type,
                                  BinaryReader &br) : PredWeightTable() {
     luma_log2_weight_denom = br.read_ue();
     if (sps->chroma_array_type())
@@ -328,7 +341,7 @@ PredWeightTable::PredWeightTable(const std::shared_ptr<SPS_NALUnit> sps,
         }
     }
 
-    if (sps->chroma_array_type()) {
+    if (slice_type % 5 == 1) {
         for (uint32_t i = 0; i < num_ref_idx_l1; i++) {
             bool luma_weight_l1_flag = br.read_bit_as_bool();
             if (luma_weight_l1_flag) {

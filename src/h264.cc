@@ -26,7 +26,7 @@ h264::h264(MP4File &mp4) {
             if (nal->nal_unit_type() <= 5 and nal->nal_unit_type() >= 1) {
                 Slice_NALUnit slice(nal);
                 slice.parse(sps, pps);
-                std::cout << slice.header().cabac_init_idc << std::endl;
+                std::cout << slice.header().disable_deblocking_filter_idc << std::endl;
                 //break;
             }
         }

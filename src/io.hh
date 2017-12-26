@@ -9,11 +9,11 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
-#include <string.h>
+#include <cstring>
 
 class BinaryReader {
 public:
-    BinaryReader(std::istream & stream) : _stream(stream) {}
+    explicit BinaryReader(std::istream & stream) : _stream(stream) {}
 
     /* read values */
     uint8_t read_uint8() { return read_raw<uint8_t>(false); }
@@ -34,13 +34,13 @@ public:
     int32_t read_int32() { return read_raw<int32_t>(_little_endian); }
     int64_t read_int64() { return read_raw<int64_t>(_little_endian); }
 
-    std::string read_bytes(uint32_t num);
+    std::string read_bytes(uint64_t num);
 
     /* for NAL */
     uint64_t read_ue();
     int64_t read_se();
     uint8_t read_bit();
-    uint64_t read_bits(uint8_t bits);
+    uint64_t read_bits(uint64_t bits);
     void reset_bit(bool skip = true) {
         _bit_pos = 0;
         seek(skip ? pos() + 1: pos());
@@ -49,14 +49,14 @@ public:
     uint8_t bit_pos() const { return _bit_pos; }
 
     /* io functions */
-    uint32_t pos() { return _stream.tellg(); }
+    uint32_t pos() { return static_cast<uint32_t>(_stream.tellg()); }
     void seek(uint32_t pos) { _stream.seekg(pos); }
     bool eof() { return _stream.eof(); }
     uint32_t size();
     void set_little_endian(bool endian) { _little_endian = endian; }
-    bool little_endian() { return little_endian(); }
+    bool little_endian() { return _little_endian; }
 
-    ~BinaryReader() {}
+    ~BinaryReader() = default;
 
 private:
     std::istream & _stream;
@@ -66,12 +66,12 @@ private:
     template<typename T> T read_raw(bool switch_endian) {
         size_t size = sizeof(T);
         std::string data = read_bytes(size);
-        const T * value = reinterpret_cast<const T *>(data.c_str());
+        auto * value = reinterpret_cast<const T *>(data.c_str());
         if (switch_endian) {
             T result;
-            char * dst = reinterpret_cast<char *>(&result);
+            auto * dst = reinterpret_cast<char *>(&result);
             memset(dst, 0, sizeof(T));
-            const char * src = reinterpret_cast<const char *>(value);
+            auto * src = reinterpret_cast<const char *>(value);
             for (uint32_t i = 0; i < size; i++) {
                 dst[size - i - 1] = src[i];
             }

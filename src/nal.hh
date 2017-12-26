@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-enum SliceType {
+enum class SliceType {
     TYPE_P = 0,
     TYPE_B = 1,
     TYPE_I = 2,
@@ -21,21 +21,41 @@ enum SliceType {
     TYPE_SI = 4,
 };
 
+inline bool operator==(uint64_t lhs, SliceType rhs) {
+    uint64_t value = lhs % 5;
+    return value == (uint64_t)rhs;
+}
+
+inline bool operator==(SliceType lhs, uint64_t rhs) {
+    uint64_t value = rhs % 5;
+    return value == (uint64_t)lhs;
+}
+
+inline bool operator!=(uint64_t lhs, SliceType rhs) {
+    uint64_t value = lhs % 5;
+    return value != (uint64_t)rhs;
+}
+
+inline bool operator!=(SliceType lhs, uint64_t rhs) {
+    uint64_t value = rhs % 5;
+    return value != (uint64_t)lhs;
+}
+
 class NALUnit {
 public:
-    NALUnit(std::string data);
+    explicit NALUnit(std::string data);
     NALUnit(BinaryReader & br, uint32_t size);
     NALUnit(NALUnit & unit): _nal_ref_idc(unit._nal_ref_idc),
-                             _nal_unit_type(unit._nal_unit_type),
-                             _data(unit._data) { parse(); }
+                                      _nal_unit_type(unit._nal_unit_type),
+                                      _data(unit._data) { parse(); }
 
     uint8_t nal_ref_idc() const { return _nal_ref_idc; }
     uint8_t  nal_unit_type() const { return _nal_unit_type; }
-    uint32_t size() { return _data.length() + 1; }
+    uint32_t size() { return static_cast<uint32_t>(_data.length() + 1); }
 
     bool idr_pic_flag() const { return _nal_unit_type == 5; }
 
-    virtual ~NALUnit() {}
+    virtual ~NALUnit() = default;
 
 protected:
     uint8_t _nal_ref_idc;
@@ -51,15 +71,15 @@ private:
 
 class SPS_NALUnit : public NALUnit {
 public:
-    SPS_NALUnit(NALUnit & unit);
-    SPS_NALUnit(std::string data);
+    explicit SPS_NALUnit(NALUnit & unit);
+    explicit SPS_NALUnit(std::string data);
 
     uint8_t profile_idc() const { return _profile_idc; }
     uint8_t flags() const { return _flags; }
     uint8_t level_idc() const { return _level_idc; }
     uint64_t sps_id() const { return _sps_id; }
     uint64_t chroma_format_idc() const { return _chroma_format_idc; }
-    uint64_t separate_colour_plane_flag() const
+    bool separate_colour_plane_flag() const
     { return _separate_colour_plane_flag; }
     uint64_t bit_depth_luma_minus8() const { return _bit_depth_luma_minus8; }
     uint64_t bit_depth_chroma_minus8() const
@@ -89,7 +109,7 @@ public:
     { return _pic_width_in_mbs_minus1; }
     uint64_t pic_height_in_map_units_minus1() const
     { return _pic_height_in_map_units_minus1; }
-    bool frame_mbs_only_flag() const { return _frame_crop_bottom_offset; }
+    bool frame_mbs_only_flag() const { return _frame_mbs_only_flag; }
     bool mb_adaptive_frame_field_flag() const
     { return _mb_adaptive_frame_field_flag; }
     bool direct_8x8_inference_flag() const
@@ -109,7 +129,7 @@ public:
     }
 
 protected:
-    void parse();
+    void parse() override;
 
 private:
     uint8_t _profile_idc = 0;
@@ -125,7 +145,7 @@ private:
     uint64_t _log2_max_frame_num_minus4 = 0;
     uint64_t _pic_order_cnt_type = 0;
     uint64_t _log2_max_pic_order_cnt_lsb_minus4 = 0;
-    bool _delta_pic_order_always_zero_flag = 0;
+    bool _delta_pic_order_always_zero_flag = false;
     int64_t _offset_for_non_ref_pic = 0;
     int64_t _offset_for_top_to_bottom_field = 0;
     uint64_t _num_ref_frames_in_pic_order_cnt_cycle = 0;
@@ -148,8 +168,8 @@ private:
 
 class PPS_NALUnit : public NALUnit {
 public:
-    PPS_NALUnit(NALUnit & unit);
-    PPS_NALUnit(std::string data);
+    explicit PPS_NALUnit(NALUnit & unit);
+    explicit PPS_NALUnit(std::string data);
 
     uint64_t pps_id() const { return _pps_id; }
     uint64_t sps_id() const { return _sps_id; }
@@ -171,23 +191,23 @@ public:
     { return _pic_size_in_map_units_minus1; }
     std::vector<uint64_t> slice_group_id() const { return _slice_group_id; }
     uint64_t num_ref_idx_l0_default_active_minus1() const
-    { return num_ref_idx_l0_default_active_minus1(); }
+    { return _num_ref_idx_l0_default_active_minus1; }
     uint64_t num_ref_idx_l1_default_active_minus1() const
     { return _num_ref_idx_l1_default_active_minus1; }
     bool weighted_pred_flag() const { return _weighted_pred_flag; }
-    uint8_t weighted_bipred_idc() const { return _weighted_bipred_idc; }
+    uint64_t weighted_bipred_idc() const { return _weighted_bipred_idc; }
     int64_t pic_init_qp_minus26() const { return _pic_init_qp_minus26;}
     int64_t pic_init_qs_minus26() const { return _pic_init_qs_minus26; }
     int64_t chroma_qp_index_offset() const { return _chroma_qp_index_offset; }
     bool deblocking_filter_control_present_flag() const
-    {return _chroma_qp_index_offset; }
+    {return _deblocking_filter_control_present_flag; }
     bool constrained_intra_pred_flag() const
     { return _constrained_intra_pred_flag; }
     bool redundant_pic_cnt_present_flag() const
     {return _redundant_pic_cnt_present_flag; }
 
 protected:
-    void parse();
+    void parse() override;
 
 private:
     uint64_t _pps_id = 0;
@@ -200,13 +220,13 @@ private:
     std::vector<uint64_t> _top_left;
     std::vector<uint64_t> _bottom_right;
     bool _slice_group_change_direction_flag = false;
-    uint64_t _slice_group_change_rate_minus1 = false;
+    uint64_t _slice_group_change_rate_minus1 = 0;
     uint64_t _pic_size_in_map_units_minus1 = 0;
     std::vector<uint64_t> _slice_group_id;
     uint64_t _num_ref_idx_l0_default_active_minus1 = 0;
     uint64_t _num_ref_idx_l1_default_active_minus1 = 0;
     bool _weighted_pred_flag = false;
-    uint8_t _weighted_bipred_idc = 0;
+    uint64_t _weighted_bipred_idc = 0;
     int64_t _pic_init_qp_minus26 = 0;
     int64_t _pic_init_qs_minus26 = 0;
     int64_t _chroma_qp_index_offset = 0;
@@ -225,15 +245,17 @@ public:
     std::vector<uint64_t> modification_of_pic_nums_idc;
     std::vector<uint64_t> abs_diff_pic_num_minus1;
     std::vector<uint64_t> long_term_pic_num;
-
+    std::vector<uint64_t> abs_diff_view_idx_minus1;
 };
 
 class PredWeightTable {
 public:
     /* TODO: refactor this after decoding is finished */
     PredWeightTable();
-    PredWeightTable(const std::shared_ptr<SPS_NALUnit> sps,
-                    const std::shared_ptr<PPS_NALUnit> pps, BinaryReader & br);
+    PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
+                    std::shared_ptr<PPS_NALUnit> pps,
+                    uint64_t slice_type,
+                    BinaryReader & br);
     uint64_t luma_log2_weight_denom = 0;
     uint64_t chroma_log2_weight_denom = 0;
     std::vector<int64_t> luma_weight_l0;
@@ -287,12 +309,12 @@ public:
     uint64_t idr_pic_id = 0;
     uint64_t pic_order_cnt_lsb = 0;
     int64_t delta_pic_order_cnt_bottom = 0;
-    int64_t delta_pic_order_cnt[2];
+    int64_t delta_pic_order_cnt[2] = {0, 0};
     uint64_t redundant_pic_cnt = 0;
     bool direct_spatial_mv_pred_flag = false;
     bool num_ref_idx_active_override_flag = false;
-    bool num_ref_idx_l0_active_minus1 = false;
-    bool num_ref_idx_l1_active_minus1 = false;
+    uint64_t num_ref_idx_l0_active_minus1 = 0;
+    uint64_t num_ref_idx_l1_active_minus1 = 0;
     uint64_t cabac_init_idc = 0;
     int64_t slice_qp_delta = 0;
     bool sp_for_switch_flag = false;
@@ -310,9 +332,10 @@ public:
 class Slice_NALUnit : public NALUnit
 {
 public:
-    Slice_NALUnit(std::string data);
-    Slice_NALUnit(NALUnit & unit);
-    Slice_NALUnit(std::shared_ptr<NALUnit> unit) : Slice_NALUnit(*unit.get()) {}
+    explicit Slice_NALUnit(std::string data);
+    explicit Slice_NALUnit(NALUnit & unit);
+    explicit Slice_NALUnit(std::shared_ptr<NALUnit> & unit) :
+            Slice_NALUnit(*unit.get()) {}
 
     void parse(std::shared_ptr<SPS_NALUnit> sps,
                std::shared_ptr<PPS_NALUnit> pps);

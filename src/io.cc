@@ -5,13 +5,12 @@
 #include "io.hh"
 #include <cmath>
 #include <experimental/filesystem>
-#include <vector>
 
 namespace fs = std::experimental::filesystem;
 using std::runtime_error;
 using std::string;
 
-string BinaryReader::read_bytes(uint32_t num) {
+string BinaryReader::read_bytes(uint64_t num) {
     std::vector<char> result(num);  // Because vector is guranteed to be contiguous in C++03
     _stream.read(&result[0], num);
 
@@ -21,7 +20,7 @@ string BinaryReader::read_bytes(uint32_t num) {
 uint32_t BinaryReader::size() {
     uint32_t pos = this->pos();
     _stream.seekg(0, std::iostream::end);
-    uint32_t size = _stream.tellg();
+    auto size = static_cast<uint32_t>(_stream.tellg());
     seek(pos);
     return size;
 }
@@ -40,7 +39,7 @@ uint64_t BinaryReader::read_ue() {
 
 int64_t BinaryReader::read_se() {
     uint64_t value = read_ue();
-    int64_t result = static_cast<int64_t>(std::ceil(value / 2.0));
+    auto result = static_cast<int64_t>(std::ceil(value / 2.0));
     return value % 2 ? result : -result;
 }
 
@@ -48,7 +47,7 @@ uint8_t BinaryReader::read_bit() {
     /* TODO: use read byte to avoid repeated disk read */
     uint32_t pos = this->pos();
     uint8_t tmp = read_uint8();
-    tmp = (tmp >> (7 - _bit_pos)) & 1;
+    tmp = static_cast<uint8_t>((tmp >> (7 - _bit_pos)) & 1);
     if (_bit_pos % 8 == 7) {
         _bit_pos = 0;
     } else {
@@ -58,11 +57,11 @@ uint8_t BinaryReader::read_bit() {
     return tmp;
 }
 
-uint64_t BinaryReader::read_bits(uint8_t bits) {
+uint64_t BinaryReader::read_bits(uint64_t bits) {
     if (bits > 64)
         throw std::runtime_error("Cannot read more than 64 bits");
     uint64_t result = 0;
-    for (int16_t i = bits - 1; i >= 0; i--) {
+    for (int i = bits - 1; i >= 0; i--) {
         uint8_t  bit = read_bit();
         result |= bit << i;
     }
