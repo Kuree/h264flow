@@ -329,8 +329,33 @@ public:
     DecRefPicMarking drpm;
 };
 
-class Slice_NALUnit : public NALUnit
-{
+
+class SliceData {
+public:
+    explicit SliceData(const NALUnit & nal) : _nal(nal) {}
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+               std::shared_ptr<PPS_NALUnit> pps, const SliceHeader & header,
+               BinaryReader & br);
+private:
+    const NALUnit & _nal;
+
+    bool mbaff_frame_flag(std::shared_ptr<SPS_NALUnit> sps,
+                          const SliceHeader & header) {
+        return  sps->mb_adaptive_frame_field_flag() && !header.field_pic_flag;
+    }
+
+    uint64_t next_mb_addr(uint64_t n, std::shared_ptr<SPS_NALUnit> sps,
+                          std::shared_ptr<PPS_NALUnit> pps,
+                          const SliceHeader & header);
+
+    std::vector<uint64_t> slice_group_map(std::shared_ptr<SPS_NALUnit> sps,
+                                          std::shared_ptr<PPS_NALUnit> pps);
+
+    bool more_rbsp_data(BinaryReader & br)
+    { return br.pos() != br.size() && !br.bit_pos(); }
+};
+
+class Slice_NALUnit : public NALUnit {
 public:
     explicit Slice_NALUnit(std::string data);
     explicit Slice_NALUnit(NALUnit & unit);
@@ -343,6 +368,7 @@ public:
     SliceHeader header() { return _header; }
 private:
     SliceHeader _header;
+    SliceData _slice_data;
 };
 
 #endif //H264FLOW_NAL_HH

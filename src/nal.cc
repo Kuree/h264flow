@@ -164,15 +164,16 @@ void PPS_NALUnit::parse() {
 }
 
 Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)),
-                                                 _header(*this, _data) {
-
-}
+                                                 _header(*this, _data),
+                                                 _slice_data(*this) {}
 
 Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit),
-                                              _header(*this, _data) {}
+                                              _header(*this, _data),
+                                              _slice_data(*this) {}
 void Slice_NALUnit::parse(std::shared_ptr<SPS_NALUnit> sps,
                           std::shared_ptr<PPS_NALUnit> pps) {
     _header.parse(std::move(sps), std::move(pps));
+
 }
 
 void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
@@ -390,4 +391,103 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
             } while (op);
         }
     }
+}
+
+void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
+                      std::shared_ptr<PPS_NALUnit> pps,
+                      const SliceHeader &header,
+                      BinaryReader &br) {
+    if (pps->entropy_coding_mode_flag())
+        br.reset_bit();
+    bool mbaff_frame_flag = this->mbaff_frame_flag(sps, header);
+    uint64_t curr_mb_addr = header.first_mb_in_slice * (1 + mbaff_frame_flag);
+    bool more_data_flag = true;
+    bool prev_mb_skipped = false;
+    do {
+        bool mb_skip_flag;
+        uint64_t mb_skip_run;
+        if (header.slice_type != SliceType::TYPE_I
+            && header.slice_type != SliceType::TYPE_SI) {
+            if (pps->entropy_coding_mode_flag()) {
+                mb_skip_run = br.read_ue();
+                prev_mb_skipped = mb_skip_run > 0;
+                for (uint64_t i = 0; i < mb_skip_run; i++ )
+                    curr_mb_addr = next_mb_addr(curr_mb_addr, sps, pps, header);
+                if (mb_skip_run > 0)
+                    more_data_flag = more_rbsp_data(br);
+            } else {
+                mb_skip_flag = br.read_bit_as_bool();
+                more_data_flag = !mb_skip_flag;
+            }
+        }
+        if (more_data_flag) {
+            if (mbaff_frame_flag && (curr_mb_addr % 2 == 0
+                                     || (curr_mb_addr % 2 == 1
+                                         && prev_mb_skipped)))
+                br.read_bit_as_bool();
+                // mb_field_decoding_flag = br.read_bit_as_bool();
+
+        }
+    } while (more_data_flag);
+}
+
+uint64_t SliceData::next_mb_addr(uint64_t n, std::shared_ptr<SPS_NALUnit> sps,
+                                 std::shared_ptr<PPS_NALUnit> pps,
+                                 const SliceHeader & header) {
+    /* Based on eqn 7-24 -> 7-28 and 8-16 */
+    uint64_t i = n + 1;
+    /* TODO: need refactoring here */
+    uint64_t PicHeightInMapUnits = sps->pic_height_in_map_units_minus1() + 1;
+    uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
+    uint64_t FrameHeightInMbs = (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits;
+    uint64_t PicHeightInMbs = FrameHeightInMbs / ( 1 + header.field_pic_flag);
+    uint64_t PicSizeInMbs = PicWidthInMbs * PicHeightInMbs;
+    std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
+    while( i < PicSizeInMbs && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
+        i++;
+    return i;
+}
+
+
+std::vector<uint64_t> SliceData::slice_group_map(
+        std::shared_ptr<SPS_NALUnit> sps, std::shared_ptr<PPS_NALUnit> pps) {
+    std::vector<uint64_t> mapUnitToSliceGroupMap(16 * 16);
+    uint64_t PicHeightInMapUnits = sps->pic_height_in_map_units_minus1() + 1;
+    uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
+    uint64_t PicSizeInMapUnits = PicWidthInMbs * PicHeightInMapUnits;
+    uint64_t i = 0;
+
+    uint64_t num_slice_groups = pps->num_slice_groups_minus1() + 1;
+
+    if (pps->slice_group_map_type() == 0) {
+        do {
+            for (uint64_t iGroup = 0; iGroup <= num_slice_groups
+                                      && i < PicSizeInMapUnits;
+                 i += pps->run_length_minus1()[iGroup++] + 1) {
+                for (uint64_t j = 0; j <= pps->run_length_minus1()[iGroup]
+                                     && i + j < PicSizeInMapUnits; j++)
+                    mapUnitToSliceGroupMap[i + j] = iGroup;
+            }
+        } while (i < PicSizeInMapUnits);
+    } else if (pps->slice_group_map_type() == 1) {
+        for (i = 0; i < PicSizeInMapUnits; i++ )
+            mapUnitToSliceGroupMap[i] = ((i % PicWidthInMbs) +
+                    (((i / PicWidthInMbs) * num_slice_groups) / 2))
+                                        % num_slice_groups;
+    } else if (pps->slice_group_map_type() == 2) {
+        for( i = 0; i < PicSizeInMapUnits; i++ )
+            mapUnitToSliceGroupMap[i] = num_slice_groups - 1;
+        for (int iGroup = (int)num_slice_groups - 2; iGroup >= 0; iGroup--) {
+            uint64_t yTopLeft = pps->top_left()[iGroup] / PicWidthInMbs;
+            uint64_t xTopLeft = pps->top_left()[iGroup] % PicWidthInMbs;
+            uint64_t yBottomRight = pps->bottom_right()[iGroup] / PicWidthInMbs;
+            uint64_t xBottomRight = pps->bottom_right()[iGroup] % PicWidthInMbs;
+            for (uint64_t y = yTopLeft; y <= yBottomRight; y++)
+                for (uint64_t x = xTopLeft; x <= xBottomRight; x++)
+                    mapUnitToSliceGroupMap[y * PicWidthInMbs + x] =
+                            (uint32_t)iGroup;
+        }
+    }
+    return mapUnitToSliceGroupMap;
+
 }
