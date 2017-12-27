@@ -159,7 +159,13 @@ void PPS_NALUnit::parse() {
     _deblocking_filter_control_present_flag = br.read_bit_as_bool();
     _constrained_intra_pred_flag = br.read_bit_as_bool();
     _redundant_pic_cnt_present_flag = br.read_bit_as_bool();
-    /* the rest is not parsed */
+    if (!br.eof()) {
+        _transform_8x8_mode_flag = br.read_bit_as_bool();
+        _pic_scaling_matrix_present_flag = br.read_bit_as_bool();
+        if (_pic_scaling_matrix_present_flag)
+            throw NotImplemented("pic_scaling_matrix_present_flag");
+        /* the rest is not parsed */
+    }
 
 }
 

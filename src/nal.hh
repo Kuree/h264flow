@@ -205,6 +205,9 @@ public:
     { return _constrained_intra_pred_flag; }
     bool redundant_pic_cnt_present_flag() const
     {return _redundant_pic_cnt_present_flag; }
+    bool transform_8x8_mode_flag() const { return _transform_8x8_mode_flag; }
+    bool pic_scaling_matrix_present_flag() const
+    { return _pic_scaling_matrix_present_flag; }
 
 protected:
     void parse() override;
@@ -233,6 +236,8 @@ private:
     bool _deblocking_filter_control_present_flag = false;
     bool _constrained_intra_pred_flag = false;
     bool _redundant_pic_cnt_present_flag = false;
+    bool _transform_8x8_mode_flag = false;
+    bool _pic_scaling_matrix_present_flag = false;
 };
 
 class RefPicListModification {
@@ -351,8 +356,7 @@ private:
     std::vector<uint64_t> slice_group_map(std::shared_ptr<SPS_NALUnit> sps,
                                           std::shared_ptr<PPS_NALUnit> pps);
 
-    bool more_rbsp_data(BinaryReader & br)
-    { return br.pos() != br.size() && !br.bit_pos(); }
+    bool more_rbsp_data(BinaryReader & br) { return !br.eof(); }
 };
 
 class Slice_NALUnit : public NALUnit {
