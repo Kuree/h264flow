@@ -10,11 +10,15 @@ using std::shared_ptr;
 using std::make_shared;
 
 
-NALUnit::NALUnit(BinaryReader & br, uint32_t size) : _nal_ref_idc(),
-                                                     _nal_unit_type(), _data() {
-    // uint32_t pos = br.pos();
+NALUnit::NALUnit(BinaryReader & br, uint32_t size, bool)
+        : _nal_ref_idc(), _nal_unit_type(), _data() {
     decode_header(br);
-    _data = br.read_bytes(size - 1);
+    //if (unescape) {
+    //    auto tmp = br.read_bytes(size - 1);
+    //    std::ostringstream stream;
+    //} else {
+        _data = br.read_bytes(size - 1);
+    //}
 }
 
 NALUnit::NALUnit(std::string data): _nal_ref_idc(),
@@ -52,6 +56,7 @@ void SPS_NALUnit::parse() {
     if( _profile_idc == 100 || _profile_idc == 110 || _profile_idc == 122 ||
         _profile_idc == 244 || _profile_idc == 44 || _profile_idc ==  83 ||
         _profile_idc == 86 || _profile_idc == 118 || _profile_idc == 128) {
+        std::cout << br.pos() << " " << uint32_t(8 - br.bit_pos()) << std::endl;
         _chroma_format_idc = br.read_ue();
         if (_chroma_format_idc == 3)
             _separate_colour_plane_flag = br.read_bit(); /* 3 -> 4:4:4 */
@@ -62,6 +67,7 @@ void SPS_NALUnit::parse() {
     _bit_depth_luma_minus8 = br.read_ue();
     _bit_depth_chroma_minus8 = br.read_ue();
     _qpprime_y_zero_transform_bypass_flag = br.read_bit_as_bool();
+    std::cout << br.pos() << " " << uint32_t(8 - br.bit_pos()) << std::endl;
     _seq_scaling_matrix_present_flag = br.read_bit_as_bool();
     if (_seq_scaling_matrix_present_flag)
         throw NotImplemented("seq_scaling_matrix_present_flag");
@@ -161,6 +167,7 @@ void PPS_NALUnit::parse() {
     _redundant_pic_cnt_present_flag = br.read_bit_as_bool();
     if (!br.eof()) {
         _transform_8x8_mode_flag = br.read_bit_as_bool();
+        std::cout << br.pos() << " " << uint32_t(8 - br.bit_pos()) << std::endl;
         _pic_scaling_matrix_present_flag = br.read_bit_as_bool();
         if (_pic_scaling_matrix_present_flag)
             throw NotImplemented("pic_scaling_matrix_present_flag");

@@ -50,11 +50,13 @@ public:
 
     /* io functions */
     uint32_t pos() { return static_cast<uint32_t>(_stream.tellg()); }
-    void seek(uint32_t pos) { _stream.seekg(pos); }
-    bool eof() { return pos() == size() && bit_pos(); }
+    void seek(uint32_t pos) { _stream.seekg(pos); _bit_pos = 0; }
+    bool eof() { return _stream.eof() || (pos() == size() && !bit_pos()); }
     uint32_t size();
     void set_little_endian(bool endian) { _little_endian = endian; }
     bool little_endian() { return _little_endian; }
+    void switch_stream(std::istream &stream)
+    { _stream.rdbuf(stream.rdbuf()); seek(0); }
 
     ~BinaryReader() = default;
 
@@ -82,5 +84,15 @@ private:
 
     }
 };
+
+class BinaryWriter {
+public:
+    explicit BinaryWriter(std::ostream & stream) : _stream(stream) {}
+    void write_uint8(uint8_t value);
+private:
+    std::ostream & _stream;
+};
+
+void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size = 0);
 
 #endif //H264FLOW_IO_HH

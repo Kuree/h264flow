@@ -44,7 +44,8 @@ inline bool operator!=(SliceType lhs, uint64_t rhs) {
 class NALUnit {
 public:
     explicit NALUnit(std::string data);
-    NALUnit(BinaryReader & br, uint32_t size);
+    NALUnit(BinaryReader & br, uint32_t size) : NALUnit(br, size, false) {}
+    NALUnit(BinaryReader & br, uint32_t size, bool unescape);
     NALUnit(NALUnit & unit): _nal_ref_idc(unit._nal_ref_idc),
                                       _nal_unit_type(unit._nal_unit_type),
                                       _data(unit._data) { parse(); }

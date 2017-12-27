@@ -67,3 +67,35 @@ uint64_t BinaryReader::read_bits(uint64_t bits) {
     }
     return result;
 }
+
+void BinaryWriter::write_uint8(uint8_t value) {
+    auto buf = reinterpret_cast<char *>(&value);
+    _stream.write(buf, sizeof(value));
+}
+
+void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
+    uint8_t zero_count = 0;
+    uint64_t stop_pos = size ? br.pos() + size : br.size();
+    while (br.pos() != stop_pos) {
+        uint8_t tmp = br.read_uint8();
+        if (tmp) {
+            bw.write_uint8(tmp);
+            zero_count = 0;
+        } else {
+            if (zero_count < 2) {
+                bw.write_uint8(tmp);
+                zero_count++;
+            } else if (zero_count == 2) {
+                /* escape the 0x03 */
+                tmp = br.read_uint8();
+                zero_count = 0;
+                if (tmp != 0x03)
+                    bw.write_uint8(tmp);
+                else if (!tmp)
+                    throw std::runtime_error("no emulation prevention found");
+            } else {
+                throw std::runtime_error("incorrect state in unescape");
+            }
+        }
+    }
+}
