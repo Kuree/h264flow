@@ -44,15 +44,18 @@ int64_t BinaryReader::read_se() {
 }
 
 uint8_t BinaryReader::read_bit() {
-    /* TODO: use read byte to avoid repeated disk read */
-    uint32_t pos = this->pos();
-    uint8_t tmp = read_uint8();
+    uint8_t tmp;
+    if (bit_pos()) {
+        tmp = _last_byte;
+    } else {
+        tmp = read_uint8();
+        _last_byte = tmp;
+    }
     tmp = static_cast<uint8_t>((tmp >> (7 - _bit_pos)) & 1);
     if (_bit_pos % 8 == 7) {
         _bit_pos = 0;
     } else {
         _bit_pos++;
-        seek(pos);
     }
     return tmp;
 }
