@@ -110,11 +110,11 @@ void MP4File::print() {
 }
 
 std::shared_ptr<Box> MP4File::find_first(const std::string & type) {
-    return _root->find_first(std::move(type));
+    return _root->find_first(type);
 }
 
 std::set<std::shared_ptr<Box>> MP4File::find_all(const std::string & type) {
-    return _root->find_all(std::move(type));
+    return _root->find_all(type);
 }
 
 MdatBox::MdatBox(Box & box) : Box(box), _nal_units() {
@@ -141,7 +141,7 @@ FullBox::FullBox(const Box & box) : Box(box), _version(), _flags() {
     BinaryReader br = get_br(stream);
 
     uint32_t tmp = br.read_uint32();
-    _version = (tmp >> 24) & 0xFF;
+    _version = static_cast<uint8_t >((tmp >> 24) & 0xFF);
     _flags = tmp & 0x00FFFFFF;
 
     _data_start = br.pos();
@@ -156,6 +156,19 @@ StsdBox::StsdBox(const Box & box) : FullBox(box) {
     for (uint32_t i = 0; i < num_sample_entries; ++i) {
         std::shared_ptr<Box> b = std::make_shared<Box>(br);
         add_child(b);
+    }
+}
+
+StcoBox::StcoBox(const Box &box, bool read_large) : FullBox(box), _entries() {
+    std::istringstream stream(_data);
+    BinaryReader br = get_br(stream);
+    uint32_t entry_count = br.read_uint32();
+    _entries = std::vector<uint64_t>(entry_count);
+    for (uint32_t i = 0 ; i < entry_count; i++) {
+        if (read_large)
+            _entries.emplace_back(br.read_uint64());
+        else
+            _entries.emplace_back(br.read_uint32());
     }
 }
 

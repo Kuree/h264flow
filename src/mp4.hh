@@ -40,8 +40,8 @@ public:
     Box(const Box & box);
     Box(std::shared_ptr<Box> box);
 
-    uint32_t size() { return _size; }
-    std::string type() { return _type; }
+    uint32_t size() const { return _size; }
+    std::string type() const { return _type; }
     std::string data() { return _data; }
 
     virtual void print(const uint32_t indent = 0);
@@ -93,14 +93,30 @@ protected:
 
 };
 
-class StsdBox : public FullBox
-{
+class StsdBox : public FullBox {
 public:
     StsdBox(const Box & box);
 };
 
-class SampleEntry : public Box
+class StcoBox : public FullBox
 {
+public:
+    StcoBox(const Box & box) : StcoBox(box, box.type() == "co64") {}
+    StcoBox(const Box & box, bool read_large);
+
+    std::vector<uint64_t> chunk_offsets() { return _entries; }
+
+private:
+    std::vector<uint64_t> _entries;
+};
+
+class Co64Box : public StcoBox {
+public:
+    Co64Box(const Box &box) : StcoBox(box, true) {}
+    Co64Box(const Box &, bool) = delete;
+};
+
+class SampleEntry : public Box {
 public:
     SampleEntry(const Box & box);
 
@@ -111,8 +127,7 @@ private:
     uint16_t data_reference_index_;
 };
 
-class VisualSampleEntry : public SampleEntry
-{
+class VisualSampleEntry : public SampleEntry {
 public:
     VisualSampleEntry(const Box & box);
 
@@ -124,7 +139,6 @@ public:
     uint32_t vertresolution() { return _vertresolution; }
     uint16_t frame_count() { return _frame_count; }
     uint16_t depth() { return _depth; }
-
 
 private:
     uint16_t _width;
@@ -159,8 +173,7 @@ private:
     std::vector<std::shared_ptr<PPS_NALUnit>> _pps_units;
 };
 
-class Avc1 : public VisualSampleEntry
-{
+class Avc1 : public VisualSampleEntry {
 public:
     Avc1(const Box & box);
 

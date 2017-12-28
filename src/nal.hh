@@ -53,6 +53,12 @@ inline bool operator!=(SliceType lhs, uint64_t rhs) {
     return value != (uint64_t)lhs;
 }
 
+
+enum class MbType {
+    I_NxN = 0,
+    I_PCM = 25,
+};
+
 class NALUnit {
 public:
     explicit NALUnit(std::string data);
@@ -370,6 +376,29 @@ private:
                                           std::shared_ptr<PPS_NALUnit> pps);
 
     bool more_rbsp_data(BinaryReader & br) { return !br.eof(); }
+};
+
+
+class MbPred {
+public:
+    MbPred() {}
+
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+               std::shared_ptr<PPS_NALUnit> pps,
+               SliceHeader & header, BinaryReader &br);
+};
+
+class MicroBlock {
+public:
+    MicroBlock() : mb_preds() {}
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+               std::shared_ptr<PPS_NALUnit> pps,
+               SliceHeader & header, BinaryReader &br);
+    uint64_t mb_type = 0;
+    bool transform_size_8x8_flag = false;
+
+    std::vector<std::shared_ptr<MbPred>> mb_preds;
+
 };
 
 class Slice_NALUnit : public NALUnit {

@@ -16,6 +16,7 @@
 
 #include "nal.hh"
 #include "util.hh"
+#include "consts.hh"
 #include <sstream>
 
 using std::shared_ptr;
@@ -513,5 +514,62 @@ std::vector<uint64_t> SliceData::slice_group_map(
         }
     }
     return mapUnitToSliceGroupMap;
+
+}
+
+void MicroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
+                       std::shared_ptr<PPS_NALUnit> pps, SliceHeader &header,
+                       BinaryReader &br) {
+    mb_type = br.read_ue();
+    if (mb_type == I_PCM) {
+        br.reset_bit(true);
+        uint64_t bit_depth_luma = 8 + sps->bit_depth_luma_minus8();
+        for (int i = 0; i < 256; i++) {
+            br.read_bits(bit_depth_luma);
+        }
+        uint32_t SubWidthC = 0;
+        uint32_t SubHeightC = 0;
+        if (sps->chroma_format_idc() == 1 || sps->chroma_format_idc() == 2)
+            SubWidthC = 2;
+        else if (sps->chroma_format_idc() == 3 &&
+                 sps->separate_colour_plane_flag())
+            SubWidthC = 1;
+        else
+            throw std::runtime_error("unsupported SubWidthC");
+        if (sps->chroma_format_idc() == 1)
+            SubHeightC = 2;
+        else if (sps->chroma_format_idc() == 2)
+            SubHeightC = 1;
+        else if (sps->chroma_format_idc() == 3 &&
+                 !sps->separate_colour_plane_flag())
+            SubHeightC = 1;
+        else
+            throw std::runtime_error("unsupported SubHeightC");
+
+
+        uint32_t MbWidthC = 16 / SubWidthC;
+        uint32_t MbHeightC = 16 / SubHeightC;
+        uint64_t bit_depth_chroma = 8 + sps->bit_depth_chroma_minus8();
+        for (uint32_t i = 0; i < 2 * MbWidthC * MbHeightC; i++)
+            br.read_bits(bit_depth_chroma);
+    } else {
+        if (mb_type != I_NxN
+            && MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16
+            && NumMbPart(mb_type) == 4) {
+            throw NotImplemented("sub_mb_pred(mb_type)");
+        } else {
+            if (pps->transform_8x8_mode_flag() && mb_type == I_NxN)
+                transform_size_8x8_flag = br.read_bit_as_bool();
+            // mb_pred
+            auto mb_pred = std::make_shared<MbPred>();
+            mb_pred->parse(sps, pps, header, br);
+            mb_preds.emplace_back(mb_pred);
+        }
+    }
+}
+
+void MbPred::parse(std::shared_ptr<SPS_NALUnit> ,
+                   std::shared_ptr<PPS_NALUnit> , SliceHeader &,
+                   BinaryReader &) {
 
 }
