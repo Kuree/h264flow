@@ -20,7 +20,15 @@ using std::shared_ptr;
 using std::runtime_error;
 
 h264::h264(MP4File &mp4) {
-    auto box = mp4.find_first("avc1");
+    auto tracks = mp4.find_all("trak");
+    std::shared_ptr<Box> box = nullptr;
+    for (const auto & track : tracks) {
+        auto b = track->find_first("avc1");
+        if (b) {
+            box = b;
+            break;
+        }
+    }
     shared_ptr<PPS_NALUnit> pps;
     shared_ptr<SPS_NALUnit> sps;
     if (box) {

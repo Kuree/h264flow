@@ -77,13 +77,14 @@ void SPS_NALUnit::parse() {
         else
             _separate_colour_plane_flag = false; /* 1->4:2:0    2-> 4:2:2 */
 
+
+        _bit_depth_luma_minus8 = br.read_ue();
+        _bit_depth_chroma_minus8 = br.read_ue();
+        _qpprime_y_zero_transform_bypass_flag = br.read_bit_as_bool();
+        _seq_scaling_matrix_present_flag = br.read_bit_as_bool();
+        if (_seq_scaling_matrix_present_flag)
+            throw NotImplemented("seq_scaling_matrix_present_flag");
     }
-    _bit_depth_luma_minus8 = br.read_ue();
-    _bit_depth_chroma_minus8 = br.read_ue();
-    _qpprime_y_zero_transform_bypass_flag = br.read_bit_as_bool();
-    _seq_scaling_matrix_present_flag = br.read_bit_as_bool();
-    if (_seq_scaling_matrix_present_flag)
-        throw NotImplemented("seq_scaling_matrix_present_flag");
     _log2_max_frame_num_minus4 = br.read_ue();
     _pic_order_cnt_type = br.read_ue();
     if (_pic_order_cnt_type == 0) {

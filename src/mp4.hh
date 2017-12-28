@@ -35,10 +35,10 @@ static const std::set<std::string> mp4_container_boxes{
 
 class Box {
 public:
-    Box(BinaryReader & br);
-    Box() : _data(), _size(), _type(), _children() {}
+    explicit Box(BinaryReader & br);
+    explicit Box() : _data(), _size(), _type(), _children() {}
     Box(const Box & box);
-    Box(std::shared_ptr<Box> box);
+    explicit Box(std::shared_ptr<Box> box);
 
     uint32_t size() const { return _size; }
     std::string type() const { return _type; }
@@ -54,14 +54,14 @@ public:
     }
     const std::vector<std::shared_ptr<Box>> children() { return _children; }
 
-    virtual ~Box() {}
+    virtual ~Box() = default;
 
 protected:
     std::string _data;
     uint32_t _size;
     std::string _type;
     std::vector<std::shared_ptr<Box>> _children;
-    uint32_t _data_start = 0;
+    uint64_t _data_start = 0;
 
     BinaryReader get_br(std::istream & stream);
 };
@@ -70,8 +70,10 @@ protected:
 class MdatBox : public Box {
 public:
     MdatBox() = delete;
-    MdatBox(Box & box);
-    MdatBox(std::shared_ptr<Box> box);
+    explicit MdatBox(Box & box) : Box(box), _nal_units() {}
+    explicit MdatBox(std::shared_ptr<Box> box): MdatBox(*box.get()) { }
+
+    void parse(std::vector<uint64_t> offsets);
 
     std::vector<std::shared_ptr<NALUnit>> nal_units() { return _nal_units; }
 
@@ -82,7 +84,7 @@ private:
 
 class FullBox : public Box {
 public:
-    FullBox(const Box & box);
+    explicit FullBox(const Box & box);
 
     uint8_t version() { return _version; }
     uint32_t flags() { return _flags; }
@@ -93,9 +95,36 @@ protected:
 
 };
 
+class TkhdBox : public FullBox
+{
+public:
+    TkhdBox(Box & box);
+    uint64_t creation_time() { return _creation_time; }
+    uint64_t modification_time() { return _modification_time; }
+    uint32_t track_id() { return _track_id; }
+    uint64_t duration() { return _duration; }
+    uint32_t width() { return _width; }
+    uint32_t height() { return _height; }
+
+private:
+    uint64_t _creation_time = 0;
+    uint64_t _modification_time = 0;
+    uint32_t _track_id = 0;
+    uint64_t _duration = 0;
+    int16_t _volume = 0;
+    uint32_t _width = 0;
+    uint32_t _height = 0;
+    int16_t _layer = 0;
+    int16_t _alternate_group = 0;
+    std::vector<int32_t> _matrix = {
+            0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x40000000
+    };
+};
+
 class StsdBox : public FullBox {
 public:
     StsdBox(const Box & box);
+    StsdBox(std::shared_ptr<Box> box) : StsdBox(*box.get()) {}
 };
 
 class StcoBox : public FullBox
@@ -184,7 +213,6 @@ private:
     uint32_t _avcc_size;
     AvcC _avcC;
 };
-
 
 class MP4File {
 public:

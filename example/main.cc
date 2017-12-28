@@ -7,7 +7,7 @@
 using namespace std;
 
 int main(int , char * []) {
-    MP4File mp4("test.mp4");
+    MP4File mp4("news.mp4");
     h264 decoder(mp4);
 
 }

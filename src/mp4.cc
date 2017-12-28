@@ -17,8 +17,10 @@
 #include "mp4.hh"
 #include <sstream>
 #include <map>
+#include <experimental/filesystem>
 
 using std::string;
+namespace fs = std::experimental::filesystem;
 
 /* this holds for most cases. however, ideally it should be provided by
  * mp4 avc box.
@@ -31,7 +33,7 @@ Box::Box(BinaryReader &br) : _data(), _size(), _type(), _children() {
     _type = br.read_bytes(4);
 
     if (mp4_container_boxes.find(_type) != mp4_container_boxes.end()) {
-        uint32_t end_pos = br.pos() + _size - 8;
+        uint64_t end_pos = br.pos() + _size - 8;
         while (br.pos() < end_pos) {
             add_child(br);
         }
@@ -56,7 +58,7 @@ void Box::add_child(std::shared_ptr<Box> box) {
 void Box::print(const uint32_t indent) {
     std::cout << std::string(indent, ' ') << "- " << _type << " "
               << _size << std::endl;
-    if (_children.size())
+    if (!_children.empty())
         for (const auto & box : _children)
             box->print(indent + 2);
 }
@@ -80,20 +82,24 @@ std::shared_ptr<Box> Box::find_first(std::string type) {
 std::set<std::shared_ptr<Box>> Box::find_all(std::string type) {
     std::set<std::shared_ptr<Box>> result;
     for (const auto & box : _children) {
-        if (box->type() == type) {
+        if (box->_type == type) {
             result.insert(box);
-            auto child_result = box->find_all(type);
-            result.insert(child_result.begin(), child_result.end());
         }
+        auto child_result = box->find_all(type);
+        result.insert(child_result.begin(), child_result.end());
     }
     return result;
 }
 
-MP4File::MP4File(std::string filename): _root(std::make_shared<Box>()), _stream() {
+MP4File::MP4File(std::string filename): _root(std::make_shared<Box>()),
+                                        _stream() {
+    fs::path p(filename.c_str());
+    if (!fs::exists(p))
+        throw std::runtime_error(filename + " not found");
     _stream.open(filename);
     BinaryReader br(_stream);
-    uint32_t end_pos = br.size() - 7;
-    while (br.pos() <= end_pos){
+    uint64_t end = br.size() - 1;
+    while (br.pos() < end){
         auto box = std::make_shared<Box>(br);
         _root->add_child(box);
     }
@@ -117,13 +123,13 @@ std::set<std::shared_ptr<Box>> MP4File::find_all(const std::string & type) {
     return _root->find_all(type);
 }
 
-MdatBox::MdatBox(Box & box) : Box(box), _nal_units() {
+void MdatBox::parse(std::vector<uint64_t> offsets) {
     std::istringstream stream(_data);
     BinaryReader br = get_br(stream);
-    while (!br.eof()) {
+    for (uint64_t offset : offsets) {
+        br.seek(offset);
         if (LENGTH_SIZE_MINUS_ONE == 3) {
             uint32_t size = br.read_uint32(true);
-            if (!size) break;
             auto nal = std::make_shared<NALUnit>(br, size);
             _nal_units.emplace_back(nal);
         } else {
@@ -131,9 +137,6 @@ MdatBox::MdatBox(Box & box) : Box(box), _nal_units() {
         }
 
     }
-}
-
-MdatBox::MdatBox(std::shared_ptr<Box> box) : MdatBox(*box.get()) {
 }
 
 FullBox::FullBox(const Box & box) : Box(box), _version(), _flags() {
@@ -157,6 +160,42 @@ StsdBox::StsdBox(const Box & box) : FullBox(box) {
         std::shared_ptr<Box> b = std::make_shared<Box>(br);
         add_child(b);
     }
+}
+
+
+TkhdBox::TkhdBox(Box &box) : FullBox(box) {
+    std::istringstream stream(_data);
+    BinaryReader br = get_br(stream);
+
+    if (version() == 1) {
+        _creation_time = br.read_uint64();
+        _modification_time = br.read_uint64();
+        _track_id = br.read_uint32();
+        br.read_bytes(4); /* reserved */
+        _duration = br.read_uint64();
+    } else {
+        _creation_time = br.read_uint32();
+        _modification_time = br.read_uint32();
+        _track_id = br.read_uint32();
+        br.read_bytes(4); /* reserved */
+        _duration = br.read_uint32();
+    }
+
+    br.read_bytes(8); /* reserved */
+    _layer = br.read_int16();
+    _alternate_group = br.read_int16();
+    _volume = br.read_int16();
+    br.read_bytes(2); /* reserved */
+
+    std::vector<int32_t> matrix;
+    for (int i = 0; i < 9; ++i) {
+        matrix.emplace_back(br.read_int32());
+    }
+    _matrix = move(matrix);
+
+    /* width and height are 16.16 fixed-point numbers */
+    _width = br.read_uint32() / 65536;
+    _height = br.read_uint32() / 65536;
 }
 
 StcoBox::StcoBox(const Box &box, bool read_large) : FullBox(box), _entries() {
@@ -244,7 +283,7 @@ AvcC::AvcC(Box &box) : Box(box), _avc_profile(), _avc_profile_compatibility(),
         throw std::runtime_error("reserved not equal to 111111'b");
     _length_size_minus_one = (uint8_t)(tmp & 0x03);
     tmp = br.read_uint8();
-    uint8_t num_sps = tmp & 0x1F;
+    uint8_t num_sps = (uint8_t)(tmp & 0x1F);
     for (uint8_t i = 0 ; i < num_sps; i++) {
         uint16_t length = br.read_uint16();
         auto unit = std::make_shared<SPS_NALUnit>(br.read_bytes(length));
