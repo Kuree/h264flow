@@ -556,6 +556,7 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
         for (uint32_t i = 0; i < 2 * MbWidthC * MbHeightC; i++)
             br.read_bits(bit_depth_chroma);
     } else {
+        bool noSubMbPartSizeLessThan8x8Flag = true;
         if (mb_type != I_NxN
             && MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16
             && NumMbPart(mb_type) == 4) {
@@ -568,6 +569,36 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             mb_pred->parse(sps, pps, header, br, *this);
             mb_preds.emplace_back(mb_pred);
         }
+        uint64_t CodedBlockPatternLuma = 0;
+        uint64_t CodedBlockPatternChroma = 0;
+        if (MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16) {
+            uint64_t coded_block_pattern = br.read_ue();
+            if (coded_block_pattern > 47)
+                throw std::runtime_error("incorrect coded block pattern");
+            coded_block_pattern =
+                    (uint64_t)codeNum_to_coded_block_pattern_intra[
+                            coded_block_pattern];
+            CodedBlockPatternLuma = coded_block_pattern % 16;
+            CodedBlockPatternChroma = coded_block_pattern / 16;
+
+            /* TODO: clea this up */
+            uint64_t B_Direct_16x16 = 0;
+
+            if (CodedBlockPatternLuma > 0 &&
+                pps->transform_8x8_mode_flag() && mb_type != I_NxN &&
+                noSubMbPartSizeLessThan8x8Flag &&
+                (mb_type != B_Direct_16x16
+                 || sps->direct_8x8_inference_flag())) {
+                transform_size_8x8_flag = br.read_bit_as_bool();
+                throw NotImplemented("transform_size_8x8_flag");
+            }
+        }
+        if (CodedBlockPatternLuma > 0 || CodedBlockPatternChroma > 0 ||
+            MbPartPredMode(mb_type, 0, header.slice_type) == Intra_16x16) {
+            mb_qp_delta = br.read_se();
+            /* residual here */
+        }
+
     }
 }
 
@@ -597,29 +628,28 @@ void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
     } else {
-        /* TODO: implementing baseline */
-        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
-            // if ((header.num_ref_idx_l0_active_minus1 > 0 ||
-            //      mb.mb_field_decoding_flag != header.field_pic_flag ) &&
-            //    MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1)
-                ref_idx_l0[mbPartIdx] = br.read_te();
-        /*
-        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+        int num_mb_part = NumMbPart(mb.mb_type);
+        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
+            if ((header.num_ref_idx_l0_active_minus1 > 0 ||
+                  mb.mb_field_decoding_flag != header.field_pic_flag ) &&
+                MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1)
+            ref_idx_l0[mbPartIdx] = br.read_te();
+        }
+
+        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if ((header.num_ref_idx_l0_active_minus1 > 0 ||
                   mb.mb_field_decoding_flag != header.field_pic_flag ) &&
                 MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0)
                 ref_idx_l1[mbPartIdx] = br.read_te();
-        */
 
-        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
-            // if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1 )
+        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
+            if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l0[mbPartIdx][0][compIdx] = br.read_se();
-        /*
+
         for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
             if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l1[mbPartIdx][0][compIdx] = br.read_se();
-        */
     }
 }

@@ -386,7 +386,9 @@ public:
     bool prev_intra4x4_pred_mode_flag[16];
     uint8_t rem_intra4x4_pred_mode[16];
     uint64_t ref_idx_l0[4];
+    uint64_t ref_idx_l1[4];
     int64_t mvd_l0[4][1][2];
+    int64_t mvd_l1[4][1][2];
     uint64_t intra_chroma_pred_mode = 0;
 };
 
@@ -403,6 +405,7 @@ public:
 
     std::vector<std::shared_ptr<MbPred>> mb_preds;
     bool mb_field_decoding_flag;
+    int64_t mb_qp_delta = 0;
 
 };
 

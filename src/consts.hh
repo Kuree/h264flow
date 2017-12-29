@@ -167,16 +167,21 @@ int I_Macroblock_Modes[27][7]=
 };
 
 
-int MbPartPredMode(uint32_t mb_type, uint32_t x, uint64_t slice_type) {
+int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
 
     return (slice_type % 5 == 0) ?
            P_and_SP_macroblock_modes[mb_type][3 + (x % 2)] :
            I_Macroblock_Modes[mb_type][3];
 }
 
-int NumMbPart(uint32_t mb_type) {
+int NumMbPart(uint64_t mb_type) {
     return P_and_SP_macroblock_modes[mb_type][2];
 }
 
+int codeNum_to_coded_block_pattern_intra[48]= {
+        47, 31, 15, 0, 23, 27, 29, 30, 7, 11, 13, 14, 39, 43, 45, 46,
+        16, 3, 5, 10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1, 2, 4,
+        8, 17, 18, 20, 24, 6, 9, 22, 25, 32, 33, 34, 36, 40, 38, 41
+};
 
 #endif //H264FLOW_CONSTS_HH
