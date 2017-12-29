@@ -35,7 +35,8 @@ static const std::set<std::string> mp4_container_boxes{
 
 class Box {
 public:
-    explicit Box(BinaryReader & br);
+    explicit Box(BinaryReader & br) : Box(br, true) {}
+    Box(BinaryReader & br, bool read_data);
     explicit Box() : _data(), _size(), _type(), _children() {}
     Box(const Box & box);
     explicit Box(std::shared_ptr<Box> box);
@@ -123,15 +124,15 @@ private:
 
 class StsdBox : public FullBox {
 public:
-    StsdBox(const Box & box);
-    StsdBox(std::shared_ptr<Box> box) : StsdBox(*box.get()) {}
+    explicit StsdBox(const Box & box);
+    explicit StsdBox(std::shared_ptr<Box> box) : StsdBox(*box.get()) {}
 };
 
 class StcoBox : public FullBox
 {
 public:
-    StcoBox(const Box & box) : StcoBox(box, box.type() == "co64") {}
-    StcoBox(const Box & box, bool read_large);
+    explicit StcoBox(const Box & box) : StcoBox(box, box.type() == "co64") {}
+    explicit StcoBox(const Box & box, bool read_large);
 
     std::vector<uint64_t> chunk_offsets() { return _entries; }
 
@@ -188,6 +189,7 @@ public:
     uint8_t avc_profile() { return _avc_profile; }
     uint8_t avc_profile_compatibility() { return _avc_profile_compatibility; }
     uint8_t avc_level() { return _avc_level; }
+    uint8_t length_size_minus_one() { return _length_size_minus_one; }
     std::vector<std::shared_ptr<SPS_NALUnit>> sps_units() { return _sps_units; }
     std::vector<std::shared_ptr<PPS_NALUnit>> pps_units() { return _pps_units; }
 private:
@@ -222,6 +224,9 @@ public:
     void print();
     std::shared_ptr<Box> find_first(const std::string & type);
     std::set<std::shared_ptr<Box>> find_all(const std::string & type);
+
+    /* used internally */
+    std::string extract_stream(uint64_t position, uint64_t size);
 
 private:
     std::shared_ptr<Box> _root;

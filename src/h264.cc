@@ -15,17 +15,20 @@
  */
 
 #include "h264.hh"
+#include <sstream>
 
 using std::shared_ptr;
 using std::runtime_error;
 
-h264::h264(MP4File &mp4) {
-    auto tracks = mp4.find_all("trak");
+h264::h264(std::shared_ptr<MP4File> mp4) : _chunk_offsets(), _mp4(mp4) {
+    if (!mp4) throw std::runtime_error("mp4 is nullptr");
+    auto tracks = mp4->find_all("trak");
     std::shared_ptr<Box> box = nullptr;
     for (const auto & track : tracks) {
         auto b = track->find_first("avc1");
         if (b) {
             box = b;
+            _trak_box = track;
             break;
         }
     }
@@ -37,18 +40,55 @@ h264::h264(MP4File &mp4) {
         auto sps_list = avc1.avcC().sps_units();
         pps = pps_list[0];
         sps = sps_list[0]; /* use the first one */
+
+        _length_size = (uint8_t)(avc1.avcC().length_size_minus_one() + 1);
     }
     if (!pps || !sps)
         throw std::runtime_error("sps or pps not found in mp4 file");
-    for (const auto & b : mp4.find_all("mdat")) {
-        MdatBox mdat(b);
-        for (auto & nal : mdat.nal_units()) {
-            if (nal->nal_unit_type() <= 5 and nal->nal_unit_type() >= 1) {
-                Slice_NALUnit slice(nal);
-                slice.parse(sps, pps);
-                std::cout << slice.header().slice_qp_delta << std::endl;
-                //break;
-            }
-        }
+    _sps = sps;
+    _pps = pps;
+
+}
+
+void h264::index_nal() {
+    auto box = _trak_box->find_first("stco");
+    if (!box) box = _trak_box->find_first("co64");
+    if (!box) throw std::runtime_error("stco/co64 not found");
+    StcoBox stco = StcoBox(*box.get());
+    for (uint64_t offset : stco.chunk_offsets()) {
+        /* TODO: build a table from frame_num to a list of offsets */
+        _chunk_offsets.emplace_back(offset);
     }
+}
+
+void h264::load_frame(uint64_t frame_num) {
+    /* TODO: this is not actually frame_num, need to strip down slice_header
+     * TODO: to obtain the actual frame_num (see TODO in index_nal()
+     */
+    if (_chunk_offsets.empty())
+        index_nal();
+    uint64_t offset = _chunk_offsets[frame_num];
+    std::string size_string = _mp4->extract_stream(offset, _length_size);
+    std::istringstream stream(size_string);
+    BinaryReader br(stream);
+    uint32_t unit_size = 0;
+    if (_length_size == 4) {
+        unit_size = br.read_uint32();
+    } else if (_length_size == 3) {
+        uint32_t hi_byte = br.read_uint8();
+        uint32_t low_bits = br.read_uint16();
+        unit_size = hi_byte << 16 | low_bits;
+    } else if (_length_size == 2) {
+        unit_size = br.read_uint16();
+    } else if (_length_size == 1) {
+        unit_size = br.read_uint8();
+    } else {
+        throw std::runtime_error("unsupported length size");
+    }
+    std::string nal_data = _mp4->extract_stream(offset + _length_size,
+                                                unit_size);
+    Slice_NALUnit slice(nal_data);
+    slice.parse(_sps, _pps);
+    auto header = slice.header();
+    std::cout << header.frame_num << " " << header.slice_qp_delta << std::endl;
 }

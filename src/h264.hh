@@ -21,7 +21,18 @@
 
 class h264 {
 public:
-    h264(MP4File & mp4);
+    h264(std::shared_ptr<MP4File> mp4);
+
+    void index_nal();
+    void load_frame(uint64_t frame_num);
+private:
+    uint8_t _length_size = 4;
+    std::vector<uint64_t> _chunk_offsets;
+    std::shared_ptr<MP4File> _mp4 = nullptr;
+    std::shared_ptr<SPS_NALUnit> _sps = nullptr;
+    std::shared_ptr<PPS_NALUnit> _pps = nullptr;
+    std::shared_ptr<Box> _trak_box = nullptr;
+
 };
 
 

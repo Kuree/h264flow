@@ -28,7 +28,8 @@ namespace fs = std::experimental::filesystem;
 static const uint32_t LENGTH_SIZE_MINUS_ONE = 3;
 
 
-Box::Box(BinaryReader &br) : _data(), _size(), _type(), _children() {
+Box::Box(BinaryReader &br, bool read_data) : _data(), _size(), _type(),
+                                             _children() {
     _size = br.read_uint32(true);
     _type = br.read_bytes(4);
 
@@ -37,8 +38,12 @@ Box::Box(BinaryReader &br) : _data(), _size(), _type(), _children() {
         while (br.pos() < end_pos) {
             add_child(br);
         }
-    } else if (_size > 8) {
+    } else if (_size > 8 && read_data && _type != "mdat") {
         _data = br.read_bytes(_size - 8);
+    } else {
+        /* skip data */
+        uint64_t dst_pos = br.pos() + _size - 8;
+        br.seek(dst_pos);
     }
 }
 
@@ -96,13 +101,15 @@ MP4File::MP4File(std::string filename): _root(std::make_shared<Box>()),
     fs::path p(filename.c_str());
     if (!fs::exists(p))
         throw std::runtime_error(filename + " not found");
-    _stream.open(filename);
+    _stream.open(filename, std::ifstream::binary);
     BinaryReader br(_stream);
     uint64_t end = br.size() - 1;
     while (br.pos() < end){
         auto box = std::make_shared<Box>(br);
         _root->add_child(box);
     }
+
+
 }
 
 MP4File::~MP4File() {
@@ -113,6 +120,12 @@ void MP4File::print() {
     for (auto const & box : _root->children()) {
         box->print();
     }
+}
+
+std::string MP4File::extract_stream(uint64_t position, uint64_t size) {
+    BinaryReader br(_stream);
+    br.seek(position);
+    return br.read_bytes(size);
 }
 
 std::shared_ptr<Box> MP4File::find_first(const std::string & type) {
@@ -205,9 +218,9 @@ StcoBox::StcoBox(const Box &box, bool read_large) : FullBox(box), _entries() {
     _entries = std::vector<uint64_t>(entry_count);
     for (uint32_t i = 0 ; i < entry_count; i++) {
         if (read_large)
-            _entries.emplace_back(br.read_uint64());
+            _entries[i] = br.read_uint64();
         else
-            _entries.emplace_back(br.read_uint32());
+            _entries[i] = br.read_uint32();
     }
 }
 
@@ -256,12 +269,12 @@ VisualSampleEntry::VisualSampleEntry(const Box & box) : SampleEntry(box),
 Avc1::Avc1(const Box & box) : VisualSampleEntry(box), _avcc_size(), _avcC() {
     std::istringstream stream(_data);
     BinaryReader br = get_br(stream);
-    uint32_t pos = br.pos();
+    uint64_t pos = br.pos();
     _avcc_size = br.read_uint32();
     string type = br.read_bytes(4);
 
     if (type != "avcC") {
-        throw std::runtime_error("AVCC does not follow AVC1 immediately");
+        throw std::runtime_error("avcC does not follow AVC1 immediately");
     }
 
     br.seek(pos);
