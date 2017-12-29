@@ -54,6 +54,9 @@ along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
 #define Intra_4x4       0
 #define Intra_16x16     1
 #define Pred_L0         2
+#define Pred_L1         3
+#define BiPred          4
+#define Direct          5
 
 #define I_NxN 0
 

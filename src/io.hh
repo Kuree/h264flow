@@ -51,6 +51,7 @@ public:
     /* for NAL */
     uint64_t read_ue();
     int64_t read_se();
+    uint64_t read_te();
     uint8_t read_bit();
     uint64_t read_bits(uint64_t bits);
     void reset_bit(bool skip = true) {

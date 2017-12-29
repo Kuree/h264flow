@@ -447,11 +447,13 @@ void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
             }
         }
         if (more_data_flag) {
+            bool mb_field_decoding_flag = true;
             if (mbaff_frame_flag && (curr_mb_addr % 2 == 0
                                      || (curr_mb_addr % 2 == 1
                                          && prev_mb_skipped)))
-                br.read_bit_as_bool();
-                // mb_field_decoding_flag = br.read_bit_as_bool();
+                mb_field_decoding_flag = br.read_bit_as_bool();
+            MacroBlock block(mb_field_decoding_flag);
+
 
         }
     } while (more_data_flag);
@@ -518,7 +520,7 @@ std::vector<uint64_t> SliceData::slice_group_map(
 
 }
 
-void MicroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
+void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
                        std::shared_ptr<PPS_NALUnit> pps, SliceHeader &header,
                        BinaryReader &br) {
     mb_type = br.read_ue();
@@ -563,14 +565,61 @@ void MicroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
                 transform_size_8x8_flag = br.read_bit_as_bool();
             // mb_pred
             auto mb_pred = std::make_shared<MbPred>();
-            mb_pred->parse(sps, pps, header, br);
+            mb_pred->parse(sps, pps, header, br, *this);
             mb_preds.emplace_back(mb_pred);
         }
     }
 }
 
-void MbPred::parse(std::shared_ptr<SPS_NALUnit> ,
-                   std::shared_ptr<PPS_NALUnit> , SliceHeader &,
-                   BinaryReader &) {
+MbPred::MbPred() {
+    for (int i = 0; i < 16; i++) {
+        prev_intra4x4_pred_mode_flag[i] = false;
+        rem_intra4x4_pred_mode[i] = 0;
+    }
+}
 
+void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
+                   std::shared_ptr<PPS_NALUnit>   , SliceHeader &header,
+                   BinaryReader &br, MacroBlock &mb) {
+    uint32_t type = (uint32_t) MbPartPredMode(mb.mb_type, 0, header.slice_type);
+    /* TODO: Intra_8x8 is not implemented */
+    if (type == Intra_4x4 || type == Intra_16x16) {
+        if (type == Intra_4x4) {
+            for (int luma4x4BlkIdx = 0; luma4x4BlkIdx < 16; luma4x4BlkIdx++) {
+                prev_intra4x4_pred_mode_flag[luma4x4BlkIdx] =
+                        br.read_bit_as_bool();
+                if (!prev_intra4x4_pred_mode_flag[luma4x4BlkIdx]) {
+                    rem_intra4x4_pred_mode[luma4x4BlkIdx] =
+                            (uint8_t)br.read_bits(3);
+                }
+            }
+        }
+        if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
+            intra_chroma_pred_mode = br.read_ue();
+    } else {
+        /* TODO: implementing baseline */
+        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+            // if ((header.num_ref_idx_l0_active_minus1 > 0 ||
+            //      mb.mb_field_decoding_flag != header.field_pic_flag ) &&
+            //    MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1)
+                ref_idx_l0[mbPartIdx] = br.read_te();
+        /*
+        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+            if ((header.num_ref_idx_l0_active_minus1 > 0 ||
+                  mb.mb_field_decoding_flag != header.field_pic_flag ) &&
+                MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0)
+                ref_idx_l1[mbPartIdx] = br.read_te();
+        */
+
+        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+            // if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1 )
+                for (int compIdx = 0; compIdx < 2; compIdx++ )
+                    mvd_l0[mbPartIdx][0][compIdx] = br.read_se();
+        /*
+        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+            if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0 )
+                for (int compIdx = 0; compIdx < 2; compIdx++ )
+                    mvd_l1[mbPartIdx][0][compIdx] = br.read_se();
+        */
+    }
 }

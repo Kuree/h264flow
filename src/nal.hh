@@ -22,6 +22,8 @@
 #include <memory>
 #include <vector>
 
+class MacroBlock;
+
 enum class SliceType {
     TYPE_P = 0,
     TYPE_B = 1,
@@ -52,12 +54,6 @@ inline bool operator!=(SliceType lhs, uint64_t rhs) {
     uint64_t value = rhs % 5;
     return value != (uint64_t)lhs;
 }
-
-
-enum class MbType {
-    I_NxN = 0,
-    I_PCM = 25,
-};
 
 class NALUnit {
 public:
@@ -381,16 +377,24 @@ private:
 
 class MbPred {
 public:
-    MbPred() {}
+    MbPred();
 
     void parse(std::shared_ptr<SPS_NALUnit> sps,
                std::shared_ptr<PPS_NALUnit> pps,
-               SliceHeader & header, BinaryReader &br);
+               SliceHeader & header, BinaryReader &br, MacroBlock & mb);
+
+    bool prev_intra4x4_pred_mode_flag[16];
+    uint8_t rem_intra4x4_pred_mode[16];
+    uint64_t ref_idx_l0[4];
+    int64_t mvd_l0[4][1][2];
+    uint64_t intra_chroma_pred_mode = 0;
 };
 
-class MicroBlock {
+class MacroBlock {
 public:
-    MicroBlock() : mb_preds() {}
+    MacroBlock(bool mb_field_decoding_flag) : mb_preds(),
+                                              mb_field_decoding_flag(
+                                                      mb_field_decoding_flag) {}
     void parse(std::shared_ptr<SPS_NALUnit> sps,
                std::shared_ptr<PPS_NALUnit> pps,
                SliceHeader & header, BinaryReader &br);
@@ -398,6 +402,7 @@ public:
     bool transform_size_8x8_flag = false;
 
     std::vector<std::shared_ptr<MbPred>> mb_preds;
+    bool mb_field_decoding_flag;
 
 };
 

@@ -49,6 +49,15 @@ uint64_t BinaryReader::read_ue() {
     return result - 1;
 }
 
+uint64_t BinaryReader::read_te() {
+    uint64_t x = read_ue();
+    if (x > 1) {
+        return x;
+    } else {
+        return static_cast<uint64_t>(!read_bit_as_bool());
+    }
+}
+
 int64_t BinaryReader::read_se() {
     uint64_t value = read_ue();
     auto result = static_cast<int64_t>(std::ceil(value / 2.0));
