@@ -143,6 +143,8 @@ void PPS_NALUnit::parse() {
     _pps_id = br.read_ue();
     _sps_id = br.read_ue();
     _entropy_coding_mode_flag = br.read_bit_as_bool();
+    if (_entropy_coding_mode_flag)
+        throw NotImplemented("entropy_coding_mode_flag");
     _bottom_field_pic_order_in_frame_present_flag = br.read_bit_as_bool();
     _num_slice_groups_minus1 = br.read_ue();
     if (_num_slice_groups_minus1 > 0) {
@@ -453,9 +455,24 @@ void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
                                          && prev_mb_skipped)))
                 mb_field_decoding_flag = br.read_bit_as_bool();
             MacroBlock block(mb_field_decoding_flag);
-
-
         }
+        if (!pps->entropy_coding_mode_flag()) {
+            // more_data_flag =
+
+        } else {
+            if (header.slice_type != SliceType::TYPE_I
+                && header.slice_type != SliceType::TYPE_SI) {
+                prev_mb_skipped = mb_skip_flag;
+                if (mbaff_frame_flag && curr_mb_addr % 2 == 0) {
+                    more_data_flag = true;
+                } else {
+                    /* TODO: not sure if that ae(v) is correct here */
+                    bool end_of_slice_flag = br.read_bit_as_bool();
+                    more_data_flag = !end_of_slice_flag;
+                }
+            }
+        }
+        curr_mb_addr = next_mb_addr(curr_mb_addr, sps, pps, header);
     } while (more_data_flag);
 }
 
@@ -527,6 +544,7 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
     if (mb_type == I_PCM) {
         br.reset_bit(true);
         uint64_t bit_depth_luma = 8 + sps->bit_depth_luma_minus8();
+        /* PCM luma */
         for (int i = 0; i < 256; i++) {
             br.read_bits(bit_depth_luma);
         }
@@ -549,10 +567,10 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
         else
             throw std::runtime_error("unsupported SubHeightC");
 
-
         uint32_t MbWidthC = 16 / SubWidthC;
         uint32_t MbHeightC = 16 / SubHeightC;
         uint64_t bit_depth_chroma = 8 + sps->bit_depth_chroma_minus8();
+        /* PCM chroma */
         for (uint32_t i = 0; i < 2 * MbWidthC * MbHeightC; i++)
             br.read_bits(bit_depth_chroma);
     } else {
@@ -562,8 +580,12 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             && NumMbPart(mb_type) == 4) {
             throw NotImplemented("sub_mb_pred(mb_type)");
         } else {
-            if (pps->transform_8x8_mode_flag() && mb_type == I_NxN)
+            if (pps->transform_8x8_mode_flag() && mb_type == I_NxN) {
+                /* Note: this is only true for !entropy */
+                if (pps->entropy_coding_mode_flag())
+                    throw NotImplemented("entropy_coding_mode not implemented");
                 transform_size_8x8_flag = br.read_bit_as_bool();
+            }
             // mb_pred
             auto mb_pred = std::make_shared<MbPred>();
             mb_pred->parse(sps, pps, header, br, *this);
@@ -628,26 +650,26 @@ void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
     } else {
-        int num_mb_part = NumMbPart(mb.mb_type);
-        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
+        uint32_t num_mb_part = NumMbPart(mb.mb_type);
+        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
             if ((header.num_ref_idx_l0_active_minus1 > 0 ||
                   mb.mb_field_decoding_flag != header.field_pic_flag ) &&
                 MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1)
             ref_idx_l0[mbPartIdx] = br.read_te();
         }
 
-        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
+        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if ((header.num_ref_idx_l0_active_minus1 > 0 ||
                   mb.mb_field_decoding_flag != header.field_pic_flag ) &&
                 MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0)
                 ref_idx_l1[mbPartIdx] = br.read_te();
 
-        for (int mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
+        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l0[mbPartIdx][0][compIdx] = br.read_se();
 
-        for (int mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
+        for (uint32_t mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
             if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l1[mbPartIdx][0][compIdx] = br.read_se();

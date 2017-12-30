@@ -72,7 +72,7 @@ Fifth column:	MbPartPredMode( mb_type, 1 )
 Sixth column:	MbPartWidth( mb_type )
 Seventh column:	MbPartHeight( mb_type )
 */
-int P_and_SP_macroblock_modes[32][7]= {
+uint32_t P_and_SP_macroblock_modes[32][7]= {
         {0,  P_L0_16x16,    1,      Pred_L0,      NA,    16,  16},
         {1,  P_L0_L0_16x8,  2,      Pred_L0, Pred_L0,    16,  8},
         {2,  P_L0_L0_8x16,  2,      Pred_L0, Pred_L0,     8,  16},
@@ -133,7 +133,7 @@ Sixth column:	CodedBlockPatternChroma
 Seventh column:	CodedBlockPatternLuma
 */
 
-int I_Macroblock_Modes[27][7]=
+uint32_t I_Macroblock_Modes[27][7]=
 {
   {0,	I_4x4,			0,	Intra_4x4,   NA, NA, NA},
   //If this line was to be commented out, the MbPartPredMode macro would have to be changed
@@ -174,7 +174,7 @@ int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
            I_Macroblock_Modes[mb_type][3];
 }
 
-int NumMbPart(uint64_t mb_type) {
+uint64_t NumMbPart(uint64_t mb_type) {
     return P_and_SP_macroblock_modes[mb_type][2];
 }
 

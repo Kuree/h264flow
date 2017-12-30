@@ -392,6 +392,11 @@ public:
     uint64_t intra_chroma_pred_mode = 0;
 };
 
+class Residual {
+public:
+
+};
+
 class MacroBlock {
 public:
     MacroBlock(bool mb_field_decoding_flag) : mb_preds(),
