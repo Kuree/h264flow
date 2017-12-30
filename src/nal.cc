@@ -605,9 +605,6 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             CodedBlockPatternLuma = coded_block_pattern % 16;
             CodedBlockPatternChroma = coded_block_pattern / 16;
 
-            /* TODO: clea this up */
-            uint64_t B_Direct_16x16 = 0;
-
             if (CodedBlockPatternLuma > 0 &&
                 pps->transform_8x8_mode_flag() && mb_type != I_NxN &&
                 noSubMbPartSizeLessThan8x8Flag &&

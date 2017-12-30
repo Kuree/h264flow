@@ -63,19 +63,30 @@ along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
 #define P_L0_4x8       2
 #define P_L0_4x4       3
 
-#define B_Direct_8x8    60 // 0
-#define B_L0_8x8        61
-#define B_L1_8x8        62
-#define B_Bi_8x8        63
-#define B_L0_8x4        64
-#define B_L0_4x8        65
-#define B_L1_8x4        66
-#define B_L1_4x8        67
-#define B_Bi_8x4        68
-#define B_Bi_4x8        69
-#define B_L0_4x4        70
-#define B_L1_4x4        71
-#define B_Bi_4x4        72  // 12
+#define B_Direct_8x8    0
+#define B_L0_8x8        1
+#define B_L1_8x8        2
+#define B_Bi_8x8        3
+#define B_L0_8x4        4
+#define B_L0_4x8        5
+#define B_L1_8x4        6
+#define B_L1_4x8        7
+#define B_Bi_8x4        8
+#define B_Bi_4x8        9
+#define B_L0_4x4        10
+#define B_L1_4x4        11
+#define B_Bi_4x4        12
+
+
+#define B_Skip         0
+#define B_Direct_16x16 0
+#define B_16x16        1
+#define B_16x8         2
+#define B_8x16         3
+#define B_8x8          4
+#define B_8x4          5
+#define B_4x8          6
+#define B_4x4          7
 
 #define I_NxN 0
 
