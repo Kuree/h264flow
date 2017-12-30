@@ -457,9 +457,10 @@ void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
             MacroBlock block(mb_field_decoding_flag);
         }
         if (!pps->entropy_coding_mode_flag()) {
-            // more_data_flag =
+            more_data_flag = !br.eof();
 
         } else {
+            throw NotImplemented("entropy_coding_mode_flag");
             if (header.slice_type != SliceType::TYPE_I
                 && header.slice_type != SliceType::TYPE_SI) {
                 prev_mb_skipped = mb_skip_flag;
@@ -575,10 +576,11 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             br.read_bits(bit_depth_chroma);
     } else {
         bool noSubMbPartSizeLessThan8x8Flag = true;
-        if (mb_type != I_NxN
+        if (MbPartPredMode(mb_type, 0, header.slice_type) != Intra_4x4
             && MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16
             && NumMbPart(mb_type) == 4) {
-            throw NotImplemented("sub_mb_pred(mb_type)");
+            auto sub_mb_pred = std::make_shared<SubMbPred>();
+            sub_mb_pred->parse(sps, pps, header, *this, br);
         } else {
             if (pps->transform_8x8_mode_flag() && mb_type == I_NxN) {
                 /* Note: this is only true for !entropy */
@@ -650,7 +652,7 @@ void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
     } else {
-        uint32_t num_mb_part = NumMbPart(mb.mb_type);
+        uint64_t num_mb_part = NumMbPart(mb.mb_type);
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
             if ((header.num_ref_idx_l0_active_minus1 > 0 ||
                   mb.mb_field_decoding_flag != header.field_pic_flag ) &&
@@ -673,5 +675,55 @@ void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
             if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l1[mbPartIdx][0][compIdx] = br.read_se();
+    }
+}
+
+
+void SubMbPred::parse(std::shared_ptr<SPS_NALUnit>,
+                      std::shared_ptr<PPS_NALUnit>, SliceHeader &header,
+                      MacroBlock &mb, BinaryReader &br) {
+    for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++)
+        sub_mb_type[mbPartIdx] = br.read_ue();
+    for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
+        if ((header.num_ref_idx_l0_active_minus1 > 0 ||
+             mb.mb_field_decoding_flag != header.field_pic_flag) &&
+            mb.mb_type != P_8x8ref0 &&
+            sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
+            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type)
+            != Pred_L1) {
+            ref_idx_l0[mbPartIdx] = br.read_te();
+        }
+    }
+    for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
+        if ((header.num_ref_idx_l1_active_minus1 > 0 ||
+             mb.mb_field_decoding_flag != header.field_pic_flag) &&
+            mb.mb_type != P_8x8ref0 &&
+            sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
+            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type)
+            != Pred_L0) {
+            ref_idx_l1[mbPartIdx] = br.read_te();
+        }
+    }
+    for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
+        if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
+            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type) != Pred_L1)
+            for (uint32_t subMbPartIdx = 0; subMbPartIdx <
+                                       NumSubMbPart(sub_mb_type[mbPartIdx],
+                                                    header.slice_type);
+                 subMbPartIdx++) {
+                for (int compIdx = 0; compIdx < 2; compIdx++)
+                    mvd_l0[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
+            }
+    }
+    for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
+        if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
+            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type) != Pred_L0)
+            for (uint32_t subMbPartIdx = 0; subMbPartIdx <
+                                       NumSubMbPart(sub_mb_type[mbPartIdx],
+                                                    header.slice_type);
+                 subMbPartIdx++) {
+                for (int compIdx = 0; compIdx < 2; compIdx++)
+                    mvd_l1[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
+            }
     }
 }

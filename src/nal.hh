@@ -392,6 +392,22 @@ public:
     uint64_t intra_chroma_pred_mode = 0;
 };
 
+
+class SubMbPred {
+public:
+    SubMbPred() = default;
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+              std::shared_ptr<PPS_NALUnit> pps,
+              SliceHeader &header,
+              MacroBlock &mb,
+              BinaryReader &br);
+    uint64_t sub_mb_type[4];
+    uint64_t ref_idx_l0[4];
+    uint64_t ref_idx_l1[4];
+    int64_t mvd_l0[4][4][2];
+    int64_t mvd_l1[4][4][2];
+};
+
 class Residual {
 public:
 
@@ -400,6 +416,7 @@ public:
 class MacroBlock {
 public:
     MacroBlock(bool mb_field_decoding_flag) : mb_preds(),
+                                              sub_mb_preds(),
                                               mb_field_decoding_flag(
                                                       mb_field_decoding_flag) {}
     void parse(std::shared_ptr<SPS_NALUnit> sps,
@@ -409,6 +426,7 @@ public:
     bool transform_size_8x8_flag = false;
 
     std::vector<std::shared_ptr<MbPred>> mb_preds;
+    std::vector<std::shared_ptr<SubMbPred>> sub_mb_preds;
     bool mb_field_decoding_flag;
     int64_t mb_qp_delta = 0;
 

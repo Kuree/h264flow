@@ -58,6 +58,25 @@ along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
 #define BiPred          4
 #define Direct          5
 
+#define P_L0_8x8       0
+#define P_L0_8x4       1
+#define P_L0_4x8       2
+#define P_L0_4x4       3
+
+#define B_Direct_8x8    60 // 0
+#define B_L0_8x8        61
+#define B_L1_8x8        62
+#define B_Bi_8x8        63
+#define B_L0_8x4        64
+#define B_L0_4x8        65
+#define B_L1_8x4        66
+#define B_L1_4x8        67
+#define B_Bi_8x4        68
+#define B_Bi_4x8        69
+#define B_L0_4x4        70
+#define B_L1_4x4        71
+#define B_Bi_4x4        72  // 12
+
 #define I_NxN 0
 
 //Inter prediction slices - Macroblock types
@@ -166,6 +185,41 @@ uint32_t I_Macroblock_Modes[27][7]=
   {25,	I_PCM,			NA,	NA,			  NA, NA, NA}
 };
 
+//Inter prediction data for submacroblocks
+//Defined strictly by the norm
+//(Table 7-17 – Sub-macroblock types in P macroblocks)
+/*
+First column:	sub_mb_type[ mbPartIdx ]
+Second coumn:	Name of sub_mb_type[ mbPartIdx ]
+Third column:	NumSubMbPart( sub_mb_type[ mbPartIdx ] )
+Fourth column:	SubMbPredMode( sub_mb_type[ mbPartIdx ] )
+Fifth column:	SubMbPartWidth( sub_mb_type[ mbPartIdx ] )
+Sixth column:	SubMbPartHeight( sub_mb_type[ mbPartIdx ] )
+*/
+uint32_t P_sub_macroblock_modes[4][6] = {
+	{0,		P_L0_8x8,			1,	Pred_L0, 8,		8},
+	{1,		P_L0_8x4,			2,	Pred_L0, 8,		4},
+	{2,		P_L0_4x8,			2,	Pred_L0, 4,		8},
+	{3,		P_L0_4x4,			4,	Pred_L0, 4,		4}
+};
+
+uint32_t B_sub_macroblock_modes[13][6] = {
+		{0, B_Direct_8x8, NA,   Direct, 4,  4},
+		{1,     B_L0_8x8,  1,  Pred_L0, 8,  8},
+		{2,     B_L1_8x8,  1,  Pred_L1, 8,  8},
+		{3,     B_Bi_8x8,  1,   BiPred, 8,  8},
+		{4,     B_L0_8x4,  2,  Pred_L0, 8,  4},
+		{5,     B_L0_4x8,  2,  Pred_L0, 4,  8},
+		{6,     B_L1_8x4,  2,  Pred_L1, 8,  4},
+		{7,     B_L1_4x8,  2,  Pred_L1, 4,  8},
+		{8,     B_Bi_8x4,  2,   BiPred, 8,  4},
+		{9,     B_Bi_4x8,  2,   BiPred, 4,  8},
+		{10,    B_L0_4x4,  4,  Pred_L0, 4,  4},
+		{11,    B_L1_4x4,  4,  Pred_L1, 4,  4},
+		{12,    B_Bi_4x4,  4,   BiPred, 4,  4},
+};
+
+
 
 int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
 
@@ -183,5 +237,26 @@ int codeNum_to_coded_block_pattern_intra[48]= {
         16, 3, 5, 10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1, 2, 4,
         8, 17, 18, 20, 24, 6, 9, 22, 25, 32, 33, 34, 36, 40, 38, 41
 };
+
+uint64_t NumSubMbPart(uint64_t sub_mb_type, uint64_t slice_type) {
+    /* TODO: might not be true */
+    if (slice_type == SliceType::TYPE_P) {
+        return P_sub_macroblock_modes[sub_mb_type][2];
+    } else if (slice_type == SliceType::TYPE_B) {
+        return B_sub_macroblock_modes[sub_mb_type][2];
+    } else {
+        throw std::runtime_error("unsupported slice_type for sub_mb_type");
+    }
+}
+
+uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type) {
+    if (slice_type == SliceType::TYPE_P) {
+        return P_sub_macroblock_modes[sub_mb_type][3];
+    } else if (slice_type == SliceType::TYPE_B) {
+        return B_sub_macroblock_modes[sub_mb_type][3];
+    } else {
+        throw std::runtime_error("unsupported slice_type for sub_mb_type");
+    }
+}
 
 #endif //H264FLOW_CONSTS_HH
