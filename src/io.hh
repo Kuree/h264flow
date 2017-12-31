@@ -54,6 +54,7 @@ public:
     uint64_t read_te();
     uint8_t read_bit();
     uint64_t read_bits(uint64_t bits);
+    uint64_t next_bits(uint64_t bits);
     void reset_bit(bool skip = true) {
         _bit_pos = 0;
         seek(skip ? pos() + 1: pos());

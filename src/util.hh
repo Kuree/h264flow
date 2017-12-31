@@ -18,6 +18,8 @@
 #define H264FLOW_UTIL_HH
 
 #include <stdexcept>
+#include "io.hh"
+#include "consts.hh"
 
 class NotImplemented : public std::logic_error
 {
@@ -42,5 +44,32 @@ static uint64_t intlog2(uint64_t x)
     return log;
 }
 
+static uint8_t read_coeff_token(int nC, BinaryReader & br) {
+    /* adapted from https://goo.gl/pWSEqT */
+    if (nC >= 8) {
+        auto code = static_cast<uint32_t>(br.read_bits(6));
+        int TotalCoeff   = (code >> 2);
+        int TrailingOnes = (code & 3);
+        if (TotalCoeff == 0 && TrailingOnes == 3)
+            TrailingOnes = 0;
+        else
+            TotalCoeff++;
+        return (uint8_t)((TotalCoeff << 2) | (TrailingOnes));
+    }
+
+    int tab = (nC == -2) ? 4 : (nC == -1) ? 3 : (nC < 2) ? 0 : (nC < 4) ? 1 : (nC < 8) ? 2 : 5;
+
+    for (int TrailingOnes = 0; TrailingOnes < 4; TrailingOnes++) {
+        for (int TotalCoeff = 0; TotalCoeff < 17; TotalCoeff++) {
+            uint32_t length = coeff_token_length[tab][TrailingOnes][TotalCoeff];
+            int code   = coeff_token_code  [tab][TrailingOnes][TotalCoeff];
+            if (length > 0 && br.next_bits(length) == code) {
+                br.read_bits(length);
+                return (uint8_t)((TotalCoeff << 2) | (TrailingOnes));
+            }
+        }
+    }
+    throw std::runtime_error("coeff_token not found");
+}
 
 #endif //H264FLOW_UTIL_HH

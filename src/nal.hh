@@ -408,9 +408,39 @@ public:
     int64_t mvd_l1[4][4][2];
 };
 
+class ResidualBlock {
+public:
+    ResidualBlock(uint32_t start_index, uint32_t end_index,
+                  uint32_t max_num_coeff, uint32_t block_index)
+            : start_index(start_index), end_index(end_index),
+              max_num_coeff(max_num_coeff), block_index(block_index) {}
+
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+               std::shared_ptr<PPS_NALUnit> pps,
+               SliceHeader & slice,
+               MacroBlock & mb,
+               BinaryReader & br);
+
+    uint32_t start_index;
+    uint32_t end_index;
+    uint32_t max_num_coeff;
+    uint32_t block_index;
+    std::vector<uint64_t> coeffLevel;
+};
+
 class Residual {
 public:
+    Residual(uint32_t start_index, uint32_t end_index)
+            : start_index(start_index), end_index(end_index) {}
+    void parse(std::shared_ptr<SPS_NALUnit> sps,
+               std::shared_ptr<PPS_NALUnit> pps,
+               SliceHeader & slice,
+               MacroBlock & mb,
+               BinaryReader & br);
 
+
+    uint32_t start_index;
+    uint32_t end_index;
 };
 
 class MacroBlock {

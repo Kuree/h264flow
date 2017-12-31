@@ -92,6 +92,15 @@ uint64_t BinaryReader::read_bits(uint64_t bits) {
     return result;
 }
 
+uint64_t BinaryReader::next_bits(uint64_t bits) {
+    uint64_t _pos = pos();
+    uint8_t bit_pos = _bit_pos;
+    uint64_t result = read_bits(bits);
+    seek(_pos); /* this one will reset _bit_pos to 0 */
+    _bit_pos = bit_pos;
+    return result;
+}
+
 void BinaryWriter::write_uint8(uint8_t value) {
     auto buf = reinterpret_cast<char *>(&value);
     _stream.write(buf, sizeof(value));

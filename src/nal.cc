@@ -724,3 +724,22 @@ void SubMbPred::parse(std::shared_ptr<SPS_NALUnit>,
             }
     }
 }
+
+void Residual::parse(std::shared_ptr<SPS_NALUnit> sps,
+                     std::shared_ptr<PPS_NALUnit> pps, SliceHeader &slice,
+                     MacroBlock &mb, BinaryReader &br) {
+    // residual_block_cavlc
+    if (start_index == 0 && MbPartPredMode(mb.mb_type, 0, slice.slice_type)
+                            == Intra_16x16) {
+
+    }
+}
+
+void ResidualBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
+                          std::shared_ptr<PPS_NALUnit> pps, SliceHeader &slice,
+                          MacroBlock &mb, BinaryReader &br) {
+    uint32_t nC = 0;
+    uint8_t coeff_token = read_coeff_token(nC, br);
+    uint8_t TotalCoeff   = coeff_token >> 2;
+    uint8_t TrailingOnes = coeff_token % 4;
+}
