@@ -191,21 +191,25 @@ void PPS_NALUnit::parse() {
 
 }
 
-Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)),
-                                                 _header(*this, _data),
-                                                 _slice_data(*this) {}
-
-Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit),
-                                              _header(*this, _data),
-                                              _slice_data(*this) {}
-void Slice_NALUnit::parse(std::shared_ptr<SPS_NALUnit> sps,
-                          std::shared_ptr<PPS_NALUnit> pps) {
-    _header.parse(std::move(sps), std::move(pps));
-
+Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)) {
+    _header = std::make_shared<SliceHeader>(*this, _data);
+    _slice_data = std::make_shared<SliceData>(*this);
 }
 
-void SliceHeader::parse(std::shared_ptr<SPS_NALUnit> sps,
-                        std::shared_ptr<PPS_NALUnit> pps) {
+Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
+
+    _header = std::make_shared<SliceHeader>(*this, _data);
+    _slice_data = std::make_shared<SliceData>(*this);
+}
+void Slice_NALUnit::parse(ParserContext & ctx) {
+    _header->parse(ctx);
+    ctx.header = _header;
+}
+
+void SliceHeader::parse(ParserContext &ctx) {
+
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::stringstream stream(_data);
     BinaryReader br(stream);
 
@@ -421,26 +425,26 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
     }
 }
 
-void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
-                      std::shared_ptr<PPS_NALUnit> pps,
-                      const SliceHeader &header,
-                      BinaryReader &br) {
+void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
     if (pps->entropy_coding_mode_flag())
         br.reset_bit();
     bool mbaff_frame_flag = this->mbaff_frame_flag(sps, header);
-    uint64_t curr_mb_addr = header.first_mb_in_slice * (1 + mbaff_frame_flag);
+    uint64_t curr_mb_addr = header->first_mb_in_slice * (1 + mbaff_frame_flag);
     bool more_data_flag = true;
     bool prev_mb_skipped = false;
     do {
         bool mb_skip_flag;
         uint64_t mb_skip_run;
-        if (header.slice_type != SliceType::TYPE_I
-            && header.slice_type != SliceType::TYPE_SI) {
+        if (header->slice_type != SliceType::TYPE_I
+            && header->slice_type != SliceType::TYPE_SI) {
             if (pps->entropy_coding_mode_flag()) {
                 mb_skip_run = br.read_ue();
                 prev_mb_skipped = mb_skip_run > 0;
                 for (uint64_t i = 0; i < mb_skip_run; i++ )
-                    curr_mb_addr = next_mb_addr(curr_mb_addr, sps, pps, header);
+                    curr_mb_addr = next_mb_addr(curr_mb_addr, ctx);
                 if (mb_skip_run > 0)
                     more_data_flag = more_rbsp_data(br);
             } else {
@@ -454,15 +458,19 @@ void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
                                      || (curr_mb_addr % 2 == 1
                                          && prev_mb_skipped)))
                 mb_field_decoding_flag = br.read_bit_as_bool();
-            MacroBlock block(mb_field_decoding_flag);
+            std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
+                    (mb_field_decoding_flag, curr_mb_addr);
+            ctx.mb = block;
+            ctx.mb->parse(ctx, br);
+            ctx.mb_array[curr_mb_addr] = block;
         }
         if (!pps->entropy_coding_mode_flag()) {
             more_data_flag = !br.eof();
 
         } else {
             throw NotImplemented("entropy_coding_mode_flag");
-            if (header.slice_type != SliceType::TYPE_I
-                && header.slice_type != SliceType::TYPE_SI) {
+            if (header->slice_type != SliceType::TYPE_I
+                && header->slice_type != SliceType::TYPE_SI) {
                 prev_mb_skipped = mb_skip_flag;
                 if (mbaff_frame_flag && curr_mb_addr % 2 == 0) {
                     more_data_flag = true;
@@ -473,23 +481,18 @@ void SliceData::parse(std::shared_ptr<SPS_NALUnit> sps,
                 }
             }
         }
-        curr_mb_addr = next_mb_addr(curr_mb_addr, sps, pps, header);
+        curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
     } while (more_data_flag);
 }
 
-uint64_t SliceData::next_mb_addr(uint64_t n, std::shared_ptr<SPS_NALUnit> sps,
-                                 std::shared_ptr<PPS_NALUnit> pps,
-                                 const SliceHeader & header) {
+uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext & ctx) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
     /* Based on eqn 7-24 -> 7-28 and 8-16 */
     uint64_t i = n + 1;
-    /* TODO: need refactoring here */
-    uint64_t PicHeightInMapUnits = sps->pic_height_in_map_units_minus1() + 1;
-    uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
-    uint64_t FrameHeightInMbs = (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits;
-    uint64_t PicHeightInMbs = FrameHeightInMbs / ( 1 + header.field_pic_flag);
-    uint64_t PicSizeInMbs = PicWidthInMbs * PicHeightInMbs;
     std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
-    while( i < PicSizeInMbs && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
+    while (i < ctx.PicSizeInMbs() && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
         i++;
     return i;
 }
@@ -538,9 +541,26 @@ std::vector<uint64_t> SliceData::slice_group_map(
 
 }
 
-void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
-                       std::shared_ptr<PPS_NALUnit> pps, SliceHeader &header,
-                       BinaryReader &br) {
+MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
+        : mb_preds(), sub_mb_preds(),
+          mb_field_decoding_flag(mb_field_decoding_flag),
+          curr_mb_addr(curr_mb_addr) {
+    for (int i = 0; i < 16; i++) {
+        TotalCoeffs_luma[i] = 0;
+    }
+    for (int i = 0; i < 4; i++) {
+        TotalCoeffs_chroma[0][i] = 0;
+        TotalCoeffs_chroma[1][i] = 0;
+    }
+}
+
+void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
+    /* compute neighbours */
+    compute_mb_neighbours(sps);
+
     mb_type = br.read_ue();
     if (mb_type == I_PCM) {
         br.reset_bit(true);
@@ -549,38 +569,17 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
         for (int i = 0; i < 256; i++) {
             br.read_bits(bit_depth_luma);
         }
-        uint32_t SubWidthC = 0;
-        uint32_t SubHeightC = 0;
-        if (sps->chroma_format_idc() == 1 || sps->chroma_format_idc() == 2)
-            SubWidthC = 2;
-        else if (sps->chroma_format_idc() == 3 &&
-                 sps->separate_colour_plane_flag())
-            SubWidthC = 1;
-        else
-            throw std::runtime_error("unsupported SubWidthC");
-        if (sps->chroma_format_idc() == 1)
-            SubHeightC = 2;
-        else if (sps->chroma_format_idc() == 2)
-            SubHeightC = 1;
-        else if (sps->chroma_format_idc() == 3 &&
-                 !sps->separate_colour_plane_flag())
-            SubHeightC = 1;
-        else
-            throw std::runtime_error("unsupported SubHeightC");
-
-        uint32_t MbWidthC = 16 / SubWidthC;
-        uint32_t MbHeightC = 16 / SubHeightC;
         uint64_t bit_depth_chroma = 8 + sps->bit_depth_chroma_minus8();
         /* PCM chroma */
-        for (uint32_t i = 0; i < 2 * MbWidthC * MbHeightC; i++)
+        for (uint32_t i = 0; i < 2 * ctx.MbWidthC() * ctx.MbHeightC(); i++)
             br.read_bits(bit_depth_chroma);
     } else {
         bool noSubMbPartSizeLessThan8x8Flag = true;
-        if (MbPartPredMode(mb_type, 0, header.slice_type) != Intra_4x4
-            && MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16
+        if (MbPartPredMode(mb_type, 0, header->slice_type) != Intra_4x4
+            && MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16
             && NumMbPart(mb_type) == 4) {
             auto sub_mb_pred = std::make_shared<SubMbPred>();
-            sub_mb_pred->parse(sps, pps, header, *this, br);
+            sub_mb_pred->parse(ctx, br);
         } else {
             if (pps->transform_8x8_mode_flag() && mb_type == I_NxN) {
                 /* Note: this is only true for !entropy */
@@ -590,12 +589,12 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             }
             // mb_pred
             auto mb_pred = std::make_shared<MbPred>();
-            mb_pred->parse(sps, pps, header, br, *this);
+            mb_pred->parse(ctx, br);
             mb_preds.emplace_back(mb_pred);
         }
         uint64_t CodedBlockPatternLuma = 0;
         uint64_t CodedBlockPatternChroma = 0;
-        if (MbPartPredMode(mb_type, 0, header.slice_type) != Intra_16x16) {
+        if (MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16) {
             uint64_t coded_block_pattern = br.read_ue();
             if (coded_block_pattern > 47)
                 throw std::runtime_error("incorrect coded block pattern");
@@ -615,11 +614,29 @@ void MacroBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
             }
         }
         if (CodedBlockPatternLuma > 0 || CodedBlockPatternChroma > 0 ||
-            MbPartPredMode(mb_type, 0, header.slice_type) == Intra_16x16) {
+            MbPartPredMode(mb_type, 0, header->slice_type) == Intra_16x16) {
             mb_qp_delta = br.read_se();
             /* residual here */
         }
 
+    }
+}
+
+void MacroBlock::compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps) {
+    uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
+    if (curr_mb_addr % PicWidthInMbs != 0) {
+        mbAddrA = curr_mb_addr - 1;
+    }
+    if (curr_mb_addr >= PicWidthInMbs) {
+        mbAddrB = curr_mb_addr - PicWidthInMbs;
+    }
+    if (curr_mb_addr >= PicWidthInMbs &&
+        (curr_mb_addr + 1) % PicWidthInMbs != 0) {
+        mbAddrC = curr_mb_addr - PicWidthInMbs + 1;
+    }
+    if (curr_mb_addr > PicWidthInMbs &&
+        curr_mb_addr % PicWidthInMbs != 0) {
+        mbAddrD = curr_mb_addr - PicWidthInMbs - 1;
     }
 }
 
@@ -630,10 +647,13 @@ MbPred::MbPred() {
     }
 }
 
-void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
-                   std::shared_ptr<PPS_NALUnit>   , SliceHeader &header,
-                   BinaryReader &br, MacroBlock &mb) {
-    uint32_t type = (uint32_t) MbPartPredMode(mb.mb_type, 0, header.slice_type);
+void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    uint32_t type = (uint32_t) MbPartPredMode(mb->mb_type, 0,
+                                              header->slice_type);
     /* TODO: Intra_8x8 is not implemented */
     if (type == Intra_4x4 || type == Intra_16x16) {
         if (type == Intra_4x4) {
@@ -649,64 +669,67 @@ void MbPred::parse(std::shared_ptr<SPS_NALUnit> sps,
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
     } else {
-        uint64_t num_mb_part = NumMbPart(mb.mb_type);
+        uint64_t num_mb_part = NumMbPart(mb->mb_type);
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
-            if ((header.num_ref_idx_l0_active_minus1 > 0 ||
-                  mb.mb_field_decoding_flag != header.field_pic_flag ) &&
-                MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1)
+            if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+                  mb->mb_field_decoding_flag != header->field_pic_flag ) &&
+                MbPartPredMode(mb->mb_type, mbPartIdx,
+                               header->slice_type) != Pred_L1)
             ref_idx_l0[mbPartIdx] = br.read_te();
         }
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
-            if ((header.num_ref_idx_l0_active_minus1 > 0 ||
-                  mb.mb_field_decoding_flag != header.field_pic_flag ) &&
-                MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0)
+            if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+                  mb->mb_field_decoding_flag != header->field_pic_flag ) &&
+                MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0)
                 ref_idx_l1[mbPartIdx] = br.read_te();
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
-            if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L1 )
+            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L1 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l0[mbPartIdx][0][compIdx] = br.read_se();
 
-        for (uint32_t mbPartIdx = 0; mbPartIdx < NumMbPart(mb.mb_type); mbPartIdx++)
-            if (MbPartPredMode(mb.mb_type, mbPartIdx, header.slice_type) != Pred_L0 )
+        for (uint32_t mbPartIdx = 0; mbPartIdx < NumMbPart(mb->mb_type); mbPartIdx++)
+            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0 )
                 for (int compIdx = 0; compIdx < 2; compIdx++ )
                     mvd_l1[mbPartIdx][0][compIdx] = br.read_se();
     }
 }
 
 
-void SubMbPred::parse(std::shared_ptr<SPS_NALUnit>,
-                      std::shared_ptr<PPS_NALUnit>, SliceHeader &header,
-                      MacroBlock &mb, BinaryReader &br) {
+void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++)
         sub_mb_type[mbPartIdx] = br.read_ue();
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
-        if ((header.num_ref_idx_l0_active_minus1 > 0 ||
-             mb.mb_field_decoding_flag != header.field_pic_flag) &&
-            mb.mb_type != P_8x8ref0 &&
+        if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+             mb->mb_field_decoding_flag != header->field_pic_flag) &&
+            mb->mb_type != P_8x8ref0 &&
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L1) {
             ref_idx_l0[mbPartIdx] = br.read_te();
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
-        if ((header.num_ref_idx_l1_active_minus1 > 0 ||
-             mb.mb_field_decoding_flag != header.field_pic_flag) &&
-            mb.mb_type != P_8x8ref0 &&
+        if ((header->num_ref_idx_l1_active_minus1 > 0 ||
+             mb->mb_field_decoding_flag != header->field_pic_flag) &&
+            mb->mb_type != P_8x8ref0 &&
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L0) {
             ref_idx_l1[mbPartIdx] = br.read_te();
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
         if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type) != Pred_L1)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type) != Pred_L1)
             for (uint32_t subMbPartIdx = 0; subMbPartIdx <
                                        NumSubMbPart(sub_mb_type[mbPartIdx],
-                                                    header.slice_type);
+                                                    header->slice_type);
                  subMbPartIdx++) {
                 for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l0[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
@@ -714,10 +737,10 @@ void SubMbPred::parse(std::shared_ptr<SPS_NALUnit>,
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
         if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header.slice_type) != Pred_L0)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type) != Pred_L0)
             for (uint32_t subMbPartIdx = 0; subMbPartIdx <
                                        NumSubMbPart(sub_mb_type[mbPartIdx],
-                                                    header.slice_type);
+                                                    header->slice_type);
                  subMbPartIdx++) {
                 for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l1[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
@@ -725,21 +748,242 @@ void SubMbPred::parse(std::shared_ptr<SPS_NALUnit>,
     }
 }
 
-void Residual::parse(std::shared_ptr<SPS_NALUnit> sps,
-                     std::shared_ptr<PPS_NALUnit> pps, SliceHeader &slice,
-                     MacroBlock &mb, BinaryReader &br) {
+void Residual::parse(ParserContext &ctx, BinaryReader &) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
     // residual_block_cavlc
-    if (start_index == 0 && MbPartPredMode(mb.mb_type, 0, slice.slice_type)
+    if (start_index == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
                             == Intra_16x16) {
 
     }
 }
 
-void ResidualBlock::parse(std::shared_ptr<SPS_NALUnit> sps,
-                          std::shared_ptr<PPS_NALUnit> pps, SliceHeader &slice,
-                          MacroBlock &mb, BinaryReader &br) {
-    uint32_t nC = 0;
+/* taken from https://github.com/emericg/MiniVideo/ */
+void ResidualBlock::parse(ParserContext &ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    int mbAddrA_temp = -1, mbAddrB_temp = -1;
+    int blkA = 0, blkB = 0;
+    int nA = 0, nB = 0, nC = 0; // Number of coefficients (TotalCoeff) in neighboring blocks
+
+    // 9.2.1 Parsing process for total number of transform coefficient levels and trailing ones
+    if (block_type == BlockType::blk_CHROMA_DC_Cb
+        || block_type == BlockType::blk_CHROMA_DC_Cr)
+    {
+        if (sps->chroma_array_type() == 1)
+            nC = -1;
+        else // if (dc->ChromaArrayType == 2)
+            nC = -2;
+    } else {
+        // 4
+        if (block_type == BlockType::blk_LUMA_16x16_DC
+            || block_type == BlockType::blk_LUMA_16x16_AC
+            || block_type == BlockType::blk_LUMA_4x4
+            || block_type == BlockType::blk_LUMA_8x8)
+        {
+            deriv_4x4lumablocks(ctx, block_index, mbAddrA_temp,
+                                blkA, mbAddrB_temp, blkB);
+        } else if (block_type == BlockType::blk_CHROMA_AC_Cb
+                   || block_type == BlockType::blk_CHROMA_AC_Cr) {
+            deriv_4x4chromablocks(ctx, block_index, mbAddrA_temp, blkA,
+                                  mbAddrB_temp, blkB);
+        }
+        if (mbAddrA_temp != -1) { // 5 6 - A
+            if (((header->slice_type == 0 || header->slice_type == 5)
+                 && mb->mb_type == P_Skip)
+                || ((header->slice_type == 1 || header->slice_type == 6)
+                    && mb->mb_type == B_Skip)) {
+                nA = 0;
+            } else if ((header->slice_type == 2 || header->slice_type == 7)
+                       && mb->mb_type == I_PCM) {
+                nA = 16;
+            } else {
+                if ((int)block_type < 4)
+                    nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_luma[blkA];
+                else if (block_type == BlockType::blk_CHROMA_AC_Cb)
+                    nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_chroma[0][blkA];
+                else if (block_type == BlockType::blk_CHROMA_AC_Cr)
+                    nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_chroma[1][blkA];
+                else
+                    throw NotImplemented("block_type > 5");
+            }
+        }
+        if (mbAddrB_temp != -1) // 5 6 - B
+        {
+            if (((header->slice_type == 0 || header->slice_type == 5)
+                 && ctx.mb_array[mbAddrA_temp]->mb_type == P_Skip) ||
+                ((header->slice_type == 1 || header->slice_type == 6)
+                 && ctx.mb_array[mbAddrA_temp]->mb_type == B_Skip)) {
+                nB = 0;
+            }
+            else if ((header->slice_type == 2 || header->slice_type == 7)
+                     && ctx.mb_array[mbAddrB_temp]->mb_type == I_PCM) {
+                nB = 16;
+            }
+            else {
+                if ((int)block_type < 4)
+                    nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_luma[blkB];
+                else if (block_type  == BlockType::blk_CHROMA_AC_Cb)
+                    nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_chroma[0][blkB];
+                else if (block_type  == BlockType::blk_CHROMA_AC_Cr)
+                    nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_chroma[1][blkB];
+                else {
+                    throw NotImplemented("block_type > 5");
+                }
+            }
+        }
+
+        // 7
+        if (mbAddrA_temp != -1 && mbAddrB_temp != -1)
+            nC = (nA + nB + 1) >> 1;
+        else if (mbAddrA_temp != -1 && mbAddrB_temp == -1)
+            nC = nA;
+        else if (mbAddrA_temp == -1 && mbAddrB_temp != -1)
+            nC = nB;
+        else
+            nC = 0;
+
+
+    }
     uint8_t coeff_token = read_coeff_token(nC, br);
-    uint8_t TotalCoeff   = coeff_token >> 2;
-    uint8_t TrailingOnes = coeff_token % 4;
+    uint8_t TotalCoeffs   = coeff_token >> 2;
+    // uint8_t TrailingOnes = coeff_token % 4;
+
+    if ((int)block_type < 4)
+        mb->TotalCoeffs_luma[block_index] = TotalCoeffs;
+    else if (block_type == BlockType::blk_CHROMA_AC_Cb)
+        mb->TotalCoeffs_chroma[0][block_index] = TotalCoeffs;
+    else if (block_type == BlockType::blk_CHROMA_AC_Cr)
+        mb->TotalCoeffs_chroma[1][block_index] = TotalCoeffs;
+    else
+        throw std::runtime_error("Could not save TotalCoeffs");
+
+    /* need to convert
+     * https://github.com/emericg/MiniVideo/tree/master/minivideo/src/decoder/h264/h264_cavlc.cpp#L223
+     */
 }
+
+void ResidualBlock::deriv_4x4lumablocks(ParserContext &ctx, const int luma4x4BlkIdx,
+                                        int &mbAddrA, int &luma4x4BlkIdxA,
+                                        int &mbAddrB, int &luma4x4BlkIdxB) {
+    int x = 0, y = 0;
+    InverseLuma4x4BlkScan(luma4x4BlkIdx, x, y);
+
+    int xA = x - 1;
+    int yA = y;
+
+    int xB = x;
+    int yB = y - 1;
+
+    int xW = 0, yW = 0;
+
+    // luma4x4BlkIdxA derivation
+    deriv_neighbouringlocations(ctx, true, xA, yA, mbAddrA, xW, yW);
+    if (mbAddrA > -1)
+        luma4x4BlkIdxA = deriv_4x4lumablock_indices(xW, yW);
+    else
+        luma4x4BlkIdxA = -1;
+
+    // luma4x4BlkIdxB derivation
+    deriv_neighbouringlocations(ctx, true, xB, yB, mbAddrB, xW, yW);
+    if (mbAddrB > -1)
+        luma4x4BlkIdxB = deriv_4x4lumablock_indices(xW, yW);
+    else
+        luma4x4BlkIdxB = -1;
+
+}
+
+inline void ResidualBlock::InverseLuma4x4BlkScan(const int luma4x4BlkIdx,
+                                                 int &x, int &y) {
+    x = InverseRasterScan_x(luma4x4BlkIdx / 4, 8, 8, 16)
+        + InverseRasterScan_x(luma4x4BlkIdx % 4, 4, 4, 8);
+    y = InverseRasterScan_y(luma4x4BlkIdx / 4, 8, 8, 16)
+        + InverseRasterScan_y(luma4x4BlkIdx % 4, 4, 4, 8);
+}
+
+void ResidualBlock::deriv_neighbouringlocations(ParserContext &ctx, const bool lumaBlock,
+        const int xN, const int yN, int &mbAddrN, int &xW, int &yW) {
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    int maxW = 16;
+    int maxH = 16;
+    if (!lumaBlock) {
+        maxW = ctx.MbWidthC();
+        maxH = ctx.MbHeightC();
+    }
+    // Checking neighbour's availability with neighbourmacroblock_availability()
+    // Now use info contained in each macroblock, to avoid useless computation
+
+    // Specification of mbAddrN (Table 6-3 with optimizations)
+    if (yN > -1) {
+        if (xN < 0)
+            mbAddrN = mb->mbAddrA;
+        else if (xN < maxW)
+            mbAddrN = (int)mb->curr_mb_addr;
+        else
+            return;
+    } else {
+        if (xN < 0)
+            mbAddrN = mb->mbAddrD;
+        else if (xN < maxW)
+            mbAddrN = mb->mbAddrB;
+        else
+            mbAddrN = mb->mbAddrC;
+    }
+    xW = (xN + maxW) % maxW;
+    yW = (yN + maxH) % maxH;
+}
+
+void ResidualBlock::deriv_4x4chromablocks(ParserContext &ctx,
+                                          const int chroma4x4BlkIdx,
+                                          int &mbAddrA, int &chroma4x4BlkIdxA,
+                                          int &mbAddrB,
+                                          int &chroma4x4BlkIdxB) {
+    int x = InverseRasterScan_x(chroma4x4BlkIdx, 4, 4, 8);
+    int y = InverseRasterScan_y(chroma4x4BlkIdx, 4, 4, 8);
+    int xA = x - 1;
+    int yA = y;
+
+    int xB = x;
+    int yB = y - 1;
+
+    int xW = 0, yW = 0;
+
+    // chroma4x4BlkIdxA derivation
+    deriv_neighbouringlocations(ctx, false, xA, yA, mbAddrA, xW, yW);
+    if (mbAddrA > -1)
+        chroma4x4BlkIdxA = deriv_4x4chromablock_indices(xW, yW);
+    else
+        chroma4x4BlkIdxA = -1;
+
+    // chroma4x4BlkIdxB derivation
+    deriv_neighbouringlocations(ctx, false, xB, yB, mbAddrB, xW, yW);
+    if (mbAddrB > -1)
+        chroma4x4BlkIdxB = deriv_4x4chromablock_indices(xW, yW);
+    else
+        chroma4x4BlkIdxB = -1;
+}
+
+uint32_t ParserContext::SubHeightC() {
+    if (sps->chroma_format_idc() == 1)
+        return 2;
+    else if (sps->chroma_format_idc() == 2)
+        return 1;
+    else if (sps->chroma_format_idc() == 3 &&
+             !sps->separate_colour_plane_flag())
+        return 1;
+    else
+        throw std::runtime_error("unsupported SubHeightC");
+}
+
+uint32_t ParserContext::SubWidthC() {
+    if (sps->chroma_format_idc() == 1 || sps->chroma_format_idc() == 2)
+        return 2;
+    else if (sps->chroma_format_idc() == 3 &&
+             sps->separate_colour_plane_flag())
+        return 1;
+    else
+        throw std::runtime_error("unsupported SubWidthC");}

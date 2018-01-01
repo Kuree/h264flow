@@ -21,8 +21,10 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <cmath>
 
 class MacroBlock;
+class ParserContext;
 
 enum class SliceType {
     TYPE_P = 0,
@@ -54,6 +56,20 @@ inline bool operator!=(SliceType lhs, uint64_t rhs) {
     uint64_t value = rhs % 5;
     return value != (uint64_t)lhs;
 }
+
+/* taken from https://github.com/emericg/MiniVideo/ */
+enum class BlockType {
+    blk_LUMA_8x8      = 0,
+    blk_LUMA_4x4      = 1,
+    blk_LUMA_16x16_DC = 2,
+    blk_LUMA_16x16_AC = 3,
+    blk_CHROMA_DC_Cb  = 4,
+    blk_CHROMA_DC_Cr  = 5,
+    blk_CHROMA_AC_Cb  = 6,
+    blk_CHROMA_AC_Cr  = 7,
+
+    blk_UNKNOWN       = 999
+};
 
 class NALUnit {
 public:
@@ -311,8 +327,7 @@ public:
     {}
     uint32_t header_size() const { return _header_size; }
 
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps);
+    void parse(ParserContext & ctx);
 private:
     uint32_t _header_size = 0;
     std::string _data;
@@ -353,20 +368,16 @@ public:
 class SliceData {
 public:
     explicit SliceData(const NALUnit & nal) : _nal(nal) {}
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps, const SliceHeader & header,
-               BinaryReader & br);
+    void parse(ParserContext & ctx, BinaryReader & br);
 private:
     const NALUnit & _nal;
 
     bool mbaff_frame_flag(std::shared_ptr<SPS_NALUnit> sps,
-                          const SliceHeader & header) {
-        return  sps->mb_adaptive_frame_field_flag() && !header.field_pic_flag;
+                          const std::shared_ptr<SliceHeader> header) {
+        return  sps->mb_adaptive_frame_field_flag() && !header->field_pic_flag;
     }
 
-    uint64_t next_mb_addr(uint64_t n, std::shared_ptr<SPS_NALUnit> sps,
-                          std::shared_ptr<PPS_NALUnit> pps,
-                          const SliceHeader & header);
+    uint64_t next_mb_addr(uint64_t n, ParserContext & ctx);
 
     std::vector<uint64_t> slice_group_map(std::shared_ptr<SPS_NALUnit> sps,
                                           std::shared_ptr<PPS_NALUnit> pps);
@@ -379,9 +390,7 @@ class MbPred {
 public:
     MbPred();
 
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps,
-               SliceHeader & header, BinaryReader &br, MacroBlock & mb);
+    void parse(ParserContext &ctx, BinaryReader &br);
 
     bool prev_intra4x4_pred_mode_flag[16];
     uint8_t rem_intra4x4_pred_mode[16];
@@ -396,11 +405,7 @@ public:
 class SubMbPred {
 public:
     SubMbPred() = default;
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-              std::shared_ptr<PPS_NALUnit> pps,
-              SliceHeader &header,
-              MacroBlock &mb,
-              BinaryReader &br);
+    void parse(ParserContext &ctx, BinaryReader &br);
     uint64_t sub_mb_type[4];
     uint64_t ref_idx_l0[4];
     uint64_t ref_idx_l1[4];
@@ -411,32 +416,65 @@ public:
 class ResidualBlock {
 public:
     ResidualBlock(uint32_t start_index, uint32_t end_index,
-                  uint32_t max_num_coeff, uint32_t block_index)
+                  uint32_t max_num_coeff, BlockType block_type,
+                  uint32_t block_index)
             : start_index(start_index), end_index(end_index),
-              max_num_coeff(max_num_coeff), block_index(block_index) {}
+              max_num_coeff(max_num_coeff), block_type(block_type),
+              block_index(block_index), coeffLevel() {}
 
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps,
-               SliceHeader & slice,
-               MacroBlock & mb,
-               BinaryReader & br);
+    void parse(ParserContext &ctx, BinaryReader & br);
 
     uint32_t start_index;
     uint32_t end_index;
     uint32_t max_num_coeff;
+    BlockType block_type;
     uint32_t block_index;
     std::vector<uint64_t> coeffLevel;
+private:
+    /* taken from https://github.com/emericg/MiniVideo */
+    void deriv_4x4lumablocks(ParserContext &ctx,
+                             const int luma4x4BlkIdx, int &mbAddrA,
+                             int &luma4x4BlkIdxA, int &mbAddrB,
+                             int &luma4x4BlkIdxB);
+    inline void InverseLuma4x4BlkScan(const int luma4x4BlkIdx, int &x, int &y);
+    inline int InverseRasterScan_x(const int a, const int b, const int,
+                                    const int d) {
+        return (a % (d / b)) * b;
+    }
+    inline int InverseRasterScan_y(const int a, const int b, const int c,
+                                   const int d) {
+        return (a / (d / b)) * c;
+    }
+    void deriv_neighbouringlocations(ParserContext &ctx, const bool lumaBlock,
+                                     const int xN, const int yN, int &mbAddrN,
+                                     int &xW, int &yW);
+    inline int deriv_4x4lumablock_indices(const int xP, const int yP) {
+        return 8 * (yP / 8) + 4 * (xP / 8) +
+                2 * ((yP % 8) / 4) + ((xP % 8) / 4);
+    }
+    void deriv_4x4chromablocks(ParserContext &ctx,
+                               const int chroma4x4BlkIdx,
+                               int &mbAddrA, int &chroma4x4BlkIdxA,
+                               int &mbAddrB, int &chroma4x4BlkIdxB);
+
+    /* From 'ITU-T H.264' recommendation:
+     * 6.4.12.2 Derivation process for 4x4 chroma block indices.
+     *
+     * This subclause is only invoked when ChromaArrayType is equal to 1 or 2.
+     * Be carefull, the equation used in this function is not the same as the one
+     * described in the specification.
+     */
+    inline int deriv_4x4chromablock_indices(const int xP, const int yP) {
+        //FIXME why this is not the same equation as in the 'ITU-T H.264' recommendation?
+        return (int)(2.0 * floor((yP / 8.0) + 0.5) + floor((xP / 8.0) + 0.5));
+    }
 };
 
 class Residual {
 public:
     Residual(uint32_t start_index, uint32_t end_index)
             : start_index(start_index), end_index(end_index) {}
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps,
-               SliceHeader & slice,
-               MacroBlock & mb,
-               BinaryReader & br);
+    void parse(ParserContext &ctx, BinaryReader & br);
 
 
     uint32_t start_index;
@@ -445,13 +483,8 @@ public:
 
 class MacroBlock {
 public:
-    MacroBlock(bool mb_field_decoding_flag) : mb_preds(),
-                                              sub_mb_preds(),
-                                              mb_field_decoding_flag(
-                                                      mb_field_decoding_flag) {}
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps,
-               SliceHeader & header, BinaryReader &br);
+    MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr);
+    void parse(ParserContext &ctx, BinaryReader &br);
     uint64_t mb_type = 0;
     bool transform_size_8x8_flag = false;
 
@@ -459,6 +492,17 @@ public:
     std::vector<std::shared_ptr<SubMbPred>> sub_mb_preds;
     bool mb_field_decoding_flag;
     int64_t mb_qp_delta = 0;
+    uint64_t curr_mb_addr;
+    int32_t mbAddrA = -1;
+    int32_t mbAddrB = -1;
+    int32_t mbAddrC = -1;
+    int32_t mbAddrD = -1;
+
+    int TotalCoeffs_luma[16];
+    int TotalCoeffs_chroma[2][4];
+
+private:
+    void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);
 
 };
 
@@ -469,13 +513,35 @@ public:
     explicit Slice_NALUnit(std::shared_ptr<NALUnit> & unit) :
             Slice_NALUnit(*unit.get()) {}
 
-    void parse(std::shared_ptr<SPS_NALUnit> sps,
-               std::shared_ptr<PPS_NALUnit> pps);
+    void parse(ParserContext & ctx);
 
-    SliceHeader header() { return _header; }
+    std::shared_ptr<SliceHeader> header() { return _header; }
 private:
-    SliceHeader _header;
-    SliceData _slice_data;
+    std::shared_ptr<SliceHeader> _header = nullptr;
+    std::shared_ptr<SliceData> _slice_data = nullptr;
+};
+
+class ParserContext {
+public:
+    ParserContext(std::shared_ptr<SPS_NALUnit> sps,
+                  std::shared_ptr<PPS_NALUnit> pps) : sps(sps), pps(pps),
+                                                      mb_array(PicSizeInMbs()) {}
+    std::shared_ptr<SPS_NALUnit> sps;
+    std::shared_ptr<PPS_NALUnit> pps;
+    std::shared_ptr<SliceHeader> header = nullptr;
+    std::shared_ptr<MacroBlock> mb = nullptr;
+    std::vector<std::shared_ptr<MacroBlock>> mb_array;
+
+    uint64_t PicHeightInMapUnits() { return sps->pic_height_in_map_units_minus1() + 1; }
+    uint64_t PicWidthInMbs() { return sps->pic_width_in_mbs_minus1() + 1; }
+    uint64_t FrameHeightInMbs() { return  (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits(); }
+    uint64_t PicHeightInMbs() { return header ? FrameHeightInMbs() / (1 + header->field_pic_flag) : 0; }
+    uint64_t PicSizeInMbs() { return PicWidthInMbs() * PicHeightInMbs(); }
+
+    uint32_t SubHeightC();
+    uint32_t SubWidthC();
+    uint32_t MbWidthC() { return 16 / SubWidthC(); }
+    uint32_t MbHeightC() { return 16 / SubHeightC(); }
 };
 
 #endif //H264FLOW_NAL_HH

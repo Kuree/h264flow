@@ -87,8 +87,9 @@ void h264::load_frame(uint64_t frame_num) {
     }
     std::string nal_data = _mp4->extract_stream(offset + _length_size,
                                                 unit_size);
+    ParserContext ctx(_sps, _pps);
     Slice_NALUnit slice(nal_data);
-    slice.parse(_sps, _pps);
+    slice.parse(ctx);
     auto header = slice.header();
-    std::cout << header.frame_num << " " << header.slice_qp_delta << std::endl;
+    std::cout << header->frame_num << " " << header->slice_qp_delta << std::endl;
 }

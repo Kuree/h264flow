@@ -62,7 +62,7 @@ static uint8_t read_coeff_token(int nC, BinaryReader & br) {
     for (int TrailingOnes = 0; TrailingOnes < 4; TrailingOnes++) {
         for (int TotalCoeff = 0; TotalCoeff < 17; TotalCoeff++) {
             uint32_t length = coeff_token_length[tab][TrailingOnes][TotalCoeff];
-            int code   = coeff_token_code  [tab][TrailingOnes][TotalCoeff];
+            uint32_t code   = coeff_token_code[tab][TrailingOnes][TotalCoeff];
             if (length > 0 && br.next_bits(length) == code) {
                 br.read_bits(length);
                 return (uint8_t)((TotalCoeff << 2) | (TrailingOnes));
