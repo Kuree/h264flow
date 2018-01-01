@@ -417,21 +417,18 @@ class ResidualBlock {
 public:
     ResidualBlock(uint32_t start_index, uint32_t end_index,
                   uint32_t max_num_coeff, BlockType block_type,
-                  uint32_t block_index, uint64_t *coeffLevel)
+                  uint32_t block_index)
             : start_index(start_index), end_index(end_index),
               max_num_coeff(max_num_coeff), block_type(block_type),
-              block_index(block_index), coeffLevel(coeffLevel) {}
+              block_index(block_index) {}
 
-    void parse(ParserContext &ctx, uint32_t startIdx,
-               uint32_t endIdx, uint32_t maxNumCoeff,
-               BinaryReader &br);
+    void parse(ParserContext &ctx, int * coeffLevel, BinaryReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
     uint32_t max_num_coeff;
     BlockType block_type;
     uint32_t block_index;
-    uint64_t *coeffLevel;
 private:
     /* taken from https://github.com/emericg/MiniVideo */
     void deriv_4x4lumablocks(ParserContext &ctx,
@@ -474,15 +471,18 @@ private:
 
 class Residual {
 public:
-    Residual(uint32_t start_index, uint32_t end_index, uint64_t *coeffLevel)
+    Residual(uint32_t start_index, uint32_t end_index)
             : start_index(start_index), end_index(end_index),
-              coeffLevel(coeffLevel) {}
+              residual_blocks() {}
     void parse(ParserContext &ctx, BinaryReader & br);
 
+    void residual_luma(ParserContext &ctx, const int startIdx,
+                       const int endIdx, BinaryReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
-    uint64_t *coeffLevel;
+
+    std::vector<std::shared_ptr<ResidualBlock>> residual_blocks;
 };
 
 class MacroBlock {
@@ -509,6 +509,9 @@ public:
     int LumaLevel8x8[4][64];                //!< An array of 4 blocks of (8x8) 64 coefficients
     int Intra16x16DCLevel[16];              //!< An array of 16 luma DC coeff
     int Intra16x16ACLevel[16][15];          //!< An array of 16 blocks of (4*4 - 1) 15 AC coefficients
+
+    uint64_t CodedBlockPatternLuma = 0;
+    uint64_t CodedBlockPatternChroma = 0;
 
 private:
     void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);

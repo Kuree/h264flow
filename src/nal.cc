@@ -592,8 +592,7 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
             mb_pred->parse(ctx, br);
             mb_preds.emplace_back(mb_pred);
         }
-        uint64_t CodedBlockPatternLuma = 0;
-        uint64_t CodedBlockPatternChroma = 0;
+
         if (MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16) {
             uint64_t coded_block_pattern = br.read_ue();
             if (coded_block_pattern > 47)
@@ -760,9 +759,97 @@ void Residual::parse(ParserContext &ctx, BinaryReader &) {
     }
 }
 
+void Residual::residual_luma(ParserContext &ctx, const int startIdx,
+                             const int endIdx, BinaryReader &br) {
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    std::shared_ptr<SliceHeader> header = ctx.header();
+    if (startIdx == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
+                         == Intra_16x16) {
+        if (ctx.pps->entropy_coding_mode_flag())
+            throw NotImplemented("entropy_coding_mode_flag");
+        else {
+            auto block = std::make_shared<ResidualBlock>(
+                    0, 15, 16, BlockType::blk_LUMA_16x16_DC, 0);
+            block->parse(ctx,  mb->Intra16x16DCLevel, br);
+            residual_blocks.emplace_back(block);
+        }
+    }
+
+    int blkIdx = 0;
+    for (int i8x8 = 0; i8x8 < 4; i8x8++) {
+        if (mb->transform_size_8x8_flag == false
+            || ctx.pps->entropy_coding_mode_flag() == false) {
+            for (int i4x4 = 0; i4x4 < 4; i4x4++) {
+                blkIdx = i8x8 * 4 + i4x4;
+
+                if (mb->CodedBlockPatternLuma & (1 << i8x8)) {
+                    if (MbPartPredMode(mb->mb_type, 0, header->slice_type)
+                        == Intra_16x16) {
+                        if (ctx.pps->entropy_coding_mode_flag())
+                            throw NotImplemented("entropy_coding_mode_flag");
+                        else {
+                            auto block = std::make_shared<ResidualBlock>(
+                                    std::max(0, startIdx - 1), endIdx - 1, 15,
+                                    BlockType::blk_LUMA_16x16_AC, blkIdx);
+                            block->parse(ctx, mb->Intra16x16ACLevel[blkIdx],
+                                         br);
+                            residual_blocks.emplace_back(block);
+                        }
+                    } else {
+                        if (ctx.pps->entropy_coding_mode_flag())
+                            throw NotImplemented("entropy_coding_mode_flag");
+                        else {
+                            auto block = std::make_shared<ResidualBlock>(
+                                    startIdx, endIdx, 16,
+                                    BlockType::blk_LUMA_4x4, blkIdx);
+                            block->parse(ctx, mb->LumaLevel4x4[blkIdx],
+                                         br);
+                            residual_blocks.emplace_back(block);
+                        }
+                    }
+                } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type)
+                           == Intra_16x16) {
+                    for (int i = 0; i < 15; i++) {
+                        mb->Intra16x16ACLevel[blkIdx][i] = 0;
+                        mb->TotalCoeffs_luma[blkIdx] = 0;
+                    }
+                } else {
+                    for (int i = 0; i < 16; i++) {
+                        mb->LumaLevel4x4[blkIdx][i] = 0;
+                        mb->TotalCoeffs_luma[blkIdx] = 0;
+                    }
+                }
+
+                if (!ctx.pps->entropy_coding_mode_flag() &&
+                    mb->transform_size_8x8_flag) {
+                    for (int i = 0; i < 16; i++) {
+                        mb->LumaLevel8x8[i8x8][4 * i + i4x4] =
+                                mb->LumaLevel4x4[blkIdx][i];
+                    }
+                }
+            }
+        } else if (mb->CodedBlockPatternLuma & (1 << i8x8)) {
+            if (ctx.pps->entropy_coding_mode_flag())
+                throw NotImplemented("entropy_coding_mode_flag");
+            else {
+                auto block = std::make_shared<ResidualBlock>(
+                        4 * startIdx, 4 * endIdx + 3, 64,
+                        BlockType::blk_LUMA_8x8, i8x8);
+                block->parse(ctx, mb->LumaLevel8x8[i8x8],
+                             br);
+                residual_blocks.emplace_back(block);
+            }
+        } else {
+            for (int i = 0; i < 64; i++) {
+                mb->LumaLevel8x8[i8x8][i] = 0;
+            }
+        }
+
+    }
+}
+
 /* taken from https://github.com/emericg/MiniVideo/ */
-void ResidualBlock::parse(ParserContext &ctx, uint32_t startIdx,
-                          uint32_t endIdx, uint32_t maxNumCoeff,
+void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
                           BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
@@ -864,7 +951,7 @@ void ResidualBlock::parse(ParserContext &ctx, uint32_t startIdx,
     else
         throw std::runtime_error("Could not save TotalCoeffs");
 
-    if (TotalCoeffs > 0 && TotalCoeffs <= maxNumCoeff) {
+    if (TotalCoeffs > 0 && TotalCoeffs <= max_num_coeff) {
         // 9.2.2 Parsing process for level information
         int level[16]; // maximum value for TotalCoeffs
         int run[16]; // maximum value for TotalCoeffs
@@ -922,7 +1009,7 @@ void ResidualBlock::parse(ParserContext &ctx, uint32_t startIdx,
 
         // 9.2.3 Parsing process for run information
         int zerosLeft = 0;
-        if (TotalCoeffs < endIdx - startIdx + 1) {
+        if (TotalCoeffs < end_index - start_index + 1) {
             int vlcnum = TotalCoeffs - 1;
             int total_zeros = 0;
 
@@ -954,7 +1041,7 @@ void ResidualBlock::parse(ParserContext &ctx, uint32_t startIdx,
         int coeffNum = -1;
         for (int i = TotalCoeffs - 1; i >= 0; i--) {
             coeffNum += run[i] + 1;
-            coeffLevel[startIdx + coeffNum] = level[i];
+            coeffLevel[start_index + coeffNum] = level[i];
         }
     }
 }
