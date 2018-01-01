@@ -203,7 +203,7 @@ Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
 }
 void Slice_NALUnit::parse(ParserContext & ctx) {
     _header->parse(ctx);
-    ctx.header = _header;
+    ctx.set_header(_header);
 }
 
 void SliceHeader::parse(ParserContext &ctx) {
@@ -428,7 +428,7 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
 void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     if (pps->entropy_coding_mode_flag())
         br.reset_bit();
     bool mbaff_frame_flag = this->mbaff_frame_flag(sps, header);
@@ -488,7 +488,7 @@ void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
 uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext & ctx) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     /* Based on eqn 7-24 -> 7-28 and 8-16 */
     uint64_t i = n + 1;
     std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
@@ -557,7 +557,7 @@ MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
 void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     /* compute neighbours */
     compute_mb_neighbours(sps);
 
@@ -650,7 +650,7 @@ MbPred::MbPred() {
 void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     uint32_t type = (uint32_t) MbPartPredMode(mb->mb_type, 0,
                                               header->slice_type);
@@ -700,7 +700,7 @@ void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
 void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++)
         sub_mb_type[mbPartIdx] = br.read_ue();
@@ -751,7 +751,7 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
 void Residual::parse(ParserContext &ctx, BinaryReader &) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     // residual_block_cavlc
     if (start_index == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
@@ -764,7 +764,7 @@ void Residual::parse(ParserContext &ctx, BinaryReader &) {
 void ResidualBlock::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header;
+    std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     int mbAddrA_temp = -1, mbAddrB_temp = -1;
     int blkA = 0, blkB = 0;
@@ -986,4 +986,10 @@ uint32_t ParserContext::SubWidthC() {
              sps->separate_colour_plane_flag())
         return 1;
     else
-        throw std::runtime_error("unsupported SubWidthC");}
+        throw std::runtime_error("unsupported SubWidthC");
+}
+
+void ParserContext::set_header(std::shared_ptr<SliceHeader> header) {
+    _header = header;
+    mb_array = std::vector<std::shared_ptr<MacroBlock>>(PicSizeInMbs());
+}

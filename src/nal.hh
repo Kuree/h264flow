@@ -528,20 +528,26 @@ public:
                                                       mb_array(PicSizeInMbs()) {}
     std::shared_ptr<SPS_NALUnit> sps;
     std::shared_ptr<PPS_NALUnit> pps;
-    std::shared_ptr<SliceHeader> header = nullptr;
     std::shared_ptr<MacroBlock> mb = nullptr;
     std::vector<std::shared_ptr<MacroBlock>> mb_array;
 
     uint64_t PicHeightInMapUnits() { return sps->pic_height_in_map_units_minus1() + 1; }
     uint64_t PicWidthInMbs() { return sps->pic_width_in_mbs_minus1() + 1; }
     uint64_t FrameHeightInMbs() { return  (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits(); }
-    uint64_t PicHeightInMbs() { return header ? FrameHeightInMbs() / (1 + header->field_pic_flag) : 0; }
+    uint64_t PicHeightInMbs()
+    { return _header ? FrameHeightInMbs() / (1 + _header->field_pic_flag) : 0; }
     uint64_t PicSizeInMbs() { return PicWidthInMbs() * PicHeightInMbs(); }
 
     uint32_t SubHeightC();
     uint32_t SubWidthC();
     uint32_t MbWidthC() { return 16 / SubWidthC(); }
     uint32_t MbHeightC() { return 16 / SubHeightC(); }
+
+    std::shared_ptr<SliceHeader> header() { return _header; }
+    void set_header(std::shared_ptr<SliceHeader> header);
+
+private:
+    std::shared_ptr<SliceHeader> _header = nullptr;
 };
 
 #endif //H264FLOW_NAL_HH
