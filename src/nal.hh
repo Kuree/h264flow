@@ -478,6 +478,8 @@ public:
 
     void residual_luma(ParserContext &ctx, const int startIdx,
                        const int endIdx, BinaryReader &br);
+    void residual_chroma(ParserContext &ctx, const int startIdx,
+                       const int endIdx, BinaryReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
@@ -509,6 +511,9 @@ public:
     int LumaLevel8x8[4][64];                //!< An array of 4 blocks of (8x8) 64 coefficients
     int Intra16x16DCLevel[16];              //!< An array of 16 luma DC coeff
     int Intra16x16ACLevel[16][15];          //!< An array of 16 blocks of (4*4 - 1) 15 AC coefficients
+
+    int ChromaDCLevel[2][4];                //!< Store chroma DC coeff
+    int ChromaACLevel[2][4][15];            //!< Store chroma AC coeff
 
     uint64_t CodedBlockPatternLuma = 0;
     uint64_t CodedBlockPatternChroma = 0;

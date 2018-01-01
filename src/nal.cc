@@ -747,7 +747,7 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
     }
 }
 
-void Residual::parse(ParserContext &ctx, BinaryReader &) {
+void Residual::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -755,7 +755,8 @@ void Residual::parse(ParserContext &ctx, BinaryReader &) {
     // residual_block_cavlc
     if (start_index == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
                             == Intra_16x16) {
-
+        residual_luma(ctx, 0, 15, br);
+        residual_chroma(ctx, 0, 15, br);
     }
 }
 
@@ -842,6 +843,61 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
         } else {
             for (int i = 0; i < 64; i++) {
                 mb->LumaLevel8x8[i8x8][i] = 0;
+            }
+        }
+
+    }
+}
+
+void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
+                               const int endIdx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    uint64_t chroma_array_type = sps->chroma_array_type();
+    if (chroma_array_type == 1 || chroma_array_type == 2) {
+        int NumC8x8 = 4 / (ctx.SubWidthC() * ctx.SubHeightC());
+        for (int iCbCr = 0; iCbCr < 2; iCbCr++) {
+            if ((mb->CodedBlockPatternChroma & 3) && (startIdx == 0)) {
+                if (ctx.pps->entropy_coding_mode_flag())
+                    throw NotImplemented("entropy_coding_mode_flag");
+                else {
+                    auto block = std::make_shared<ResidualBlock>(
+                            0, 4 * NumC8x8 - 1, 4 * NumC8x8,
+                            (BlockType)((int)BlockType::blk_CHROMA_DC_Cb + iCbCr), 0);
+                    block->parse(ctx, mb->ChromaDCLevel[iCbCr],
+                                 br);
+                    residual_blocks.emplace_back(block);
+                }
+            } else {
+                for (int i = 0; i < (4 * NumC8x8); i++) {
+                    mb->ChromaDCLevel[iCbCr][i] = 0;
+                }
+            }
+        }
+
+        for (int iCbCr = 0; iCbCr < 2; iCbCr++) {
+            for (int i8x8 = 0; i8x8 < NumC8x8; i8x8++) {
+                for (int i4x4 = 0; i4x4 < 4; i4x4++) {
+                    int blkIdx = i8x8*4 + i4x4;
+                    if (mb->CodedBlockPatternChroma & 2) {
+                        if (ctx.pps->entropy_coding_mode_flag())
+                            throw NotImplemented("entropy_coding_mode_flag");
+                        else {
+                            auto block = std::make_shared<ResidualBlock>(
+                                    std::max(0, startIdx - 1), endIdx - 1, 15,
+                                    (BlockType) (
+                                            (int) BlockType::blk_CHROMA_AC_Cb +
+                                            iCbCr), blkIdx);
+                            block->parse(ctx, mb->ChromaACLevel[iCbCr][blkIdx],
+                                         br);
+                            residual_blocks.emplace_back(block);
+                        }
+                    } else {
+                        for (int i = 0; i < 15; i++) {
+                            mb->ChromaACLevel[iCbCr][blkIdx][i] = 0;
+                        }
+                    }
+                }
             }
         }
 
