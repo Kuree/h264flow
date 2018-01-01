@@ -72,4 +72,51 @@ static uint8_t read_coeff_token(int nC, BinaryReader & br) {
     throw std::runtime_error("coeff_token not found");
 }
 
+static uint8_t read_ce_levelprefix(BinaryReader &br) {
+    int leadingZeroBits = -1;
+    for (int b = 0; !b; leadingZeroBits++)
+        b = br.read_bit();
+    return leadingZeroBits;
+}
+
+static int code_from_bitstream_2d(BinaryReader &br,
+                                  const uint8_t *lentab, const uint8_t *codtab,
+                                  const int tabwidth, const int tabheight) {
+    const uint8_t *len = &lentab[0];
+    const uint8_t *cod = &codtab[0];
+    for (int j = 0; j < tabheight; j++) {
+        for (int i = 0; i < tabwidth; i++) {
+            if ((*len == 0) || (br.next_bits(*len) != *cod)) {
+                ++len;
+                ++cod;
+            } else {
+                // Move bitstream pointer
+                br.read_bits(*len);
+
+                // The syntax element value
+                return i;
+            }
+        }
+    }
+
+    throw std::runtime_error("unable to decode bit stream 2d");
+}
+
+static int read_ce_totalzeros(BinaryReader &br, const int vlcnum,
+                              const int chromadc) {
+    if (!chromadc)
+        return code_from_bitstream_2d(br, &totalzeros_lentab[vlcnum][0],
+                                      &totalzeros_codtab[vlcnum][0], 16, 1);
+    else
+        return  code_from_bitstream_2d(br,
+                                       &totalzeros_chromadc_lentab[0][vlcnum][0],
+                                       &totalzeros_chromadc_codtab[0][vlcnum][0],
+                                       4, 1);
+}
+
+int read_ce_runbefore(BinaryReader &br, const int vlcnum) {
+    return code_from_bitstream_2d(br, &runbefore_lentab[vlcnum][0],
+                                  &runbefore_codtab[vlcnum][0], 16, 1);
+}
+
 #endif //H264FLOW_UTIL_HH

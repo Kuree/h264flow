@@ -16,8 +16,8 @@
 
 #include "nal.hh"
 #include "util.hh"
-#include "consts.hh"
 #include <sstream>
+#include <algorithm>
 
 using std::shared_ptr;
 using std::make_shared;
@@ -761,7 +761,9 @@ void Residual::parse(ParserContext &ctx, BinaryReader &) {
 }
 
 /* taken from https://github.com/emericg/MiniVideo/ */
-void ResidualBlock::parse(ParserContext &ctx, BinaryReader &br) {
+void ResidualBlock::parse(ParserContext &ctx, uint32_t startIdx,
+                          uint32_t endIdx, uint32_t maxNumCoeff,
+                          BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -851,7 +853,7 @@ void ResidualBlock::parse(ParserContext &ctx, BinaryReader &br) {
     }
     uint8_t coeff_token = read_coeff_token(nC, br);
     uint8_t TotalCoeffs   = coeff_token >> 2;
-    // uint8_t TrailingOnes = coeff_token % 4;
+    uint8_t TrailingOnes = coeff_token % 4;
 
     if ((int)block_type < 4)
         mb->TotalCoeffs_luma[block_index] = TotalCoeffs;
@@ -862,9 +864,99 @@ void ResidualBlock::parse(ParserContext &ctx, BinaryReader &br) {
     else
         throw std::runtime_error("Could not save TotalCoeffs");
 
-    /* need to convert
-     * https://github.com/emericg/MiniVideo/tree/master/minivideo/src/decoder/h264/h264_cavlc.cpp#L223
-     */
+    if (TotalCoeffs > 0 && TotalCoeffs <= maxNumCoeff) {
+        // 9.2.2 Parsing process for level information
+        int level[16]; // maximum value for TotalCoeffs
+        int run[16]; // maximum value for TotalCoeffs
+        int suffixLength = 0;
+
+        if (TotalCoeffs > 10 && TrailingOnes < 3)
+            suffixLength = 1;
+
+
+        for (int i = 0; i < TotalCoeffs; i++) {
+            if (i < TrailingOnes) {
+                bool trailing_ones_sign_flag = br.read_bit();
+                level[i] = 1 - 2 * trailing_ones_sign_flag;
+            } else {
+                int level_prefix = read_ce_levelprefix(br);
+                int levelCode = std::min(15, level_prefix) << suffixLength;
+
+                if (suffixLength > 0 || level_prefix >= 14) {
+                    int levelSuffixSize = suffixLength;
+
+                    if (level_prefix == 14 && suffixLength == 0)
+                        levelSuffixSize = 4;
+                    else if (level_prefix > 14)
+                        levelSuffixSize = level_prefix - 3;
+
+                    auto level_suffix = (int)br.read_bits(levelSuffixSize);
+                    levelCode += level_suffix;
+                }
+
+                if (level_prefix >= 15 && suffixLength == 0)
+                    levelCode += 15;
+
+                if (level_prefix >= 16)
+                    levelCode += (1 << (level_prefix - 3)) - 4096;
+
+                if (i == TrailingOnes && TrailingOnes < 3)
+                    levelCode += 2;
+
+                if (levelCode % 2 == 0)
+                    level[i] = (levelCode + 2) >> 1;
+                else
+                    level[i] = (-levelCode - 1) >> 1;
+
+                if (suffixLength == 0)
+                    suffixLength = 1;
+
+                {
+                    int vtest = (3 << (suffixLength - 1));
+                    if ((abs(level[i]) > vtest) && (suffixLength < 6)) {
+                        suffixLength++;
+                    }
+                }
+            }
+        }
+
+        // 9.2.3 Parsing process for run information
+        int zerosLeft = 0;
+        if (TotalCoeffs < endIdx - startIdx + 1) {
+            int vlcnum = TotalCoeffs - 1;
+            int total_zeros = 0;
+
+            if (block_type != BlockType ::blk_CHROMA_DC_Cb
+                && block_type != BlockType::blk_CHROMA_DC_Cr)
+                total_zeros = read_ce_totalzeros(br, vlcnum, 0);
+            else
+                total_zeros = read_ce_totalzeros(br, vlcnum, 1);
+
+            zerosLeft = total_zeros;
+        } else {
+            zerosLeft = 0;
+        }
+
+        for (int i = 0; i < TotalCoeffs - 1; i++) {
+            if (zerosLeft > 0) {
+                int vlcnum = std::min(zerosLeft - 1, RUNBEFORE_NUM_M1);
+                int run_before = read_ce_runbefore(br, vlcnum);
+                run[i] = run_before;
+            } else {
+                run[i] = 0;
+            }
+
+            zerosLeft -= run[i];
+        }
+
+        // Decoded coefficients :
+        run[TotalCoeffs - 1] = zerosLeft;
+        int coeffNum = -1;
+        for (int i = TotalCoeffs - 1; i >= 0; i--) {
+            coeffNum += run[i] + 1;
+            coeffLevel[startIdx + coeffNum] = level[i];
+        }
+    }
 }
 
 void ResidualBlock::deriv_4x4lumablocks(ParserContext &ctx, const int luma4x4BlkIdx,

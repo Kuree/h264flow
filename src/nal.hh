@@ -417,19 +417,21 @@ class ResidualBlock {
 public:
     ResidualBlock(uint32_t start_index, uint32_t end_index,
                   uint32_t max_num_coeff, BlockType block_type,
-                  uint32_t block_index)
+                  uint32_t block_index, uint64_t *coeffLevel)
             : start_index(start_index), end_index(end_index),
               max_num_coeff(max_num_coeff), block_type(block_type),
-              block_index(block_index), coeffLevel() {}
+              block_index(block_index), coeffLevel(coeffLevel) {}
 
-    void parse(ParserContext &ctx, BinaryReader & br);
+    void parse(ParserContext &ctx, uint32_t startIdx,
+               uint32_t endIdx, uint32_t maxNumCoeff,
+               BinaryReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
     uint32_t max_num_coeff;
     BlockType block_type;
     uint32_t block_index;
-    std::vector<uint64_t> coeffLevel;
+    uint64_t *coeffLevel;
 private:
     /* taken from https://github.com/emericg/MiniVideo */
     void deriv_4x4lumablocks(ParserContext &ctx,
@@ -472,13 +474,15 @@ private:
 
 class Residual {
 public:
-    Residual(uint32_t start_index, uint32_t end_index)
-            : start_index(start_index), end_index(end_index) {}
+    Residual(uint32_t start_index, uint32_t end_index, uint64_t *coeffLevel)
+            : start_index(start_index), end_index(end_index),
+              coeffLevel(coeffLevel) {}
     void parse(ParserContext &ctx, BinaryReader & br);
 
 
     uint32_t start_index;
     uint32_t end_index;
+    uint64_t *coeffLevel;
 };
 
 class MacroBlock {
@@ -500,6 +504,11 @@ public:
 
     int TotalCoeffs_luma[16];
     int TotalCoeffs_chroma[2][4];
+
+    int LumaLevel4x4[16][16];               //!< An array of 16 blocks of (4x4) 16 coefficients
+    int LumaLevel8x8[4][64];                //!< An array of 4 blocks of (8x8) 64 coefficients
+    int Intra16x16DCLevel[16];              //!< An array of 16 luma DC coeff
+    int Intra16x16ACLevel[16][15];          //!< An array of 16 blocks of (4*4 - 1) 15 AC coefficients
 
 private:
     void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);
