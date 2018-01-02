@@ -201,9 +201,12 @@ Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
     _header = std::make_shared<SliceHeader>(*this, _data);
     _slice_data = std::make_shared<SliceData>(*this);
 }
+
 void Slice_NALUnit::parse(ParserContext & ctx) {
     _header->parse(ctx);
     ctx.set_header(_header);
+    /* TODO: fix this later */
+    _slice_data->parse(ctx);
 }
 
 void SliceHeader::parse(ParserContext &ctx) {
@@ -425,7 +428,12 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
     }
 }
 
-void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
+void SliceData::parse(ParserContext & ctx) {
+    std::string data = _nal.data();
+    std::istringstream stream(data);
+    BinaryReader br(stream);
+    br.seek(_nal.header_size());
+
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -616,6 +624,8 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
             MbPartPredMode(mb_type, 0, header->slice_type) == Intra_16x16) {
             mb_qp_delta = br.read_se();
             /* residual here */
+            residual = std::make_shared<Residual>(0, 15);
+            residual->parse(ctx, br);
         }
 
     }

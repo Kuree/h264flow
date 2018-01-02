@@ -25,6 +25,7 @@
 
 class MacroBlock;
 class ParserContext;
+class Slice_NALUnit;
 
 enum class SliceType {
     TYPE_P = 0,
@@ -85,6 +86,8 @@ public:
     uint32_t size() { return static_cast<uint32_t>(_data.length() + 1); }
 
     bool idr_pic_flag() const { return _nal_unit_type == 5; }
+    /* TODO: fix this */
+    std::string data() const { return _data; }
 
     virtual ~NALUnit() = default;
 
@@ -323,9 +326,9 @@ public:
     // SliceHeader();
     SliceHeader(const NALUnit & nal, std::string & data): _data(data),
                                                           _nal(nal), rplm(),
-                                                          pwt(), drpm()
-    {}
-    uint32_t header_size() const { return _header_size; }
+                                                          pwt(), drpm() {}
+
+    uint64_t header_size() const { return _header_size; }
 
     void parse(ParserContext & ctx);
 private:
@@ -367,10 +370,10 @@ public:
 
 class SliceData {
 public:
-    explicit SliceData(const NALUnit & nal) : _nal(nal) {}
-    void parse(ParserContext & ctx, BinaryReader & br);
+    explicit SliceData(const Slice_NALUnit & nal) : _nal(nal) {}
+    void parse(ParserContext & ctx);
 private:
-    const NALUnit & _nal;
+    const Slice_NALUnit & _nal;
 
     bool mbaff_frame_flag(std::shared_ptr<SPS_NALUnit> sps,
                           const std::shared_ptr<SliceHeader> header) {
@@ -496,6 +499,7 @@ public:
 
     std::vector<std::shared_ptr<MbPred>> mb_preds;
     std::vector<std::shared_ptr<SubMbPred>> sub_mb_preds;
+    std::shared_ptr<Residual> residual = nullptr;
     bool mb_field_decoding_flag;
     int64_t mb_qp_delta = 0;
     uint64_t curr_mb_addr;
@@ -533,6 +537,8 @@ public:
     void parse(ParserContext & ctx);
 
     std::shared_ptr<SliceHeader> header() { return _header; }
+    uint64_t header_size() const
+    { return _header ? _header->header_size() : 0; }
 private:
     std::shared_ptr<SliceHeader> _header = nullptr;
     std::shared_ptr<SliceData> _slice_data = nullptr;
