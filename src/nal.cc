@@ -508,14 +508,18 @@ uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext & ctx) {
 
 std::vector<uint64_t> SliceData::slice_group_map(
         std::shared_ptr<SPS_NALUnit> sps, std::shared_ptr<PPS_NALUnit> pps) {
-    std::vector<uint64_t> mapUnitToSliceGroupMap(16 * 16);
     uint64_t PicHeightInMapUnits = sps->pic_height_in_map_units_minus1() + 1;
     uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
     uint64_t PicSizeInMapUnits = PicWidthInMbs * PicHeightInMapUnits;
     uint64_t i = 0;
+    std::vector<uint64_t> mapUnitToSliceGroupMap(PicSizeInMapUnits);
 
     uint64_t num_slice_groups = pps->num_slice_groups_minus1() + 1;
-
+    if (num_slice_groups == 1) {
+        for (i = 0; i < PicSizeInMapUnits; i++)
+            mapUnitToSliceGroupMap[i] = 0;
+        return mapUnitToSliceGroupMap;
+    }
     if (pps->slice_group_map_type() == 0) {
         do {
             for (uint64_t iGroup = 0; iGroup <= num_slice_groups
