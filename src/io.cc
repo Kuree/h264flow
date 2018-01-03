@@ -109,16 +109,18 @@ void BinaryWriter::write_uint8(uint8_t value) {
 void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
     uint8_t zero_count = 0;
     uint64_t stop_pos = size ? br.pos() + size : br.size();
-    while (br.pos() != stop_pos) {
+    while (br.pos() < stop_pos) {
         uint8_t tmp = br.read_uint8();
         if (tmp) {
             bw.write_uint8(tmp);
             zero_count = 0;
         } else {
-            if (zero_count < 2) {
+            if (zero_count < 1) {
                 bw.write_uint8(tmp);
                 zero_count++;
-            } else if (zero_count == 2) {
+            } else if (zero_count == 1) {
+                /* write the 0 first */
+                bw.write_uint8(tmp);
                 /* escape the 0x03 */
                 tmp = br.read_uint8();
                 zero_count = 0;
@@ -131,4 +133,5 @@ void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
             }
         }
     }
+    std::cout << std::dec << std::endl;
 }

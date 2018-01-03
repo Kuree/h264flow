@@ -22,6 +22,7 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <utility>
 
 class MacroBlock;
 class ParserContext;
@@ -74,7 +75,7 @@ enum class BlockType {
 
 class NALUnit {
 public:
-    explicit NALUnit(std::string data);
+    explicit NALUnit(std::string data, bool unescape = true);
     NALUnit(BinaryReader & br, uint32_t size) : NALUnit(br, size, true) {}
     NALUnit(BinaryReader & br, uint32_t size, bool unescape);
     NALUnit(NALUnit & unit): _nal_ref_idc(unit._nal_ref_idc),
@@ -328,11 +329,13 @@ public:
                                                           _nal(nal), rplm(),
                                                           pwt(), drpm() {}
 
-    uint64_t header_size() const { return _header_size; }
+    std::pair<uint64_t, uint8_t> header_size() const
+    { return std::make_pair<uint64_t, uint8_t>(
+                (uint64_t)_header_size[0], (uint8_t)_header_size[1]); }
 
     void parse(ParserContext & ctx);
 private:
-    uint32_t _header_size = 0;
+    uint64_t _header_size[2] = {0, 0};
     std::string _data;
     const NALUnit & _nal;
 
@@ -537,8 +540,9 @@ public:
     void parse(ParserContext & ctx);
 
     std::shared_ptr<SliceHeader> header() { return _header; }
-    uint64_t header_size() const
-    { return _header ? _header->header_size() : 0; }
+    std::pair<uint64_t, uint8_t> header_size() const
+    { return _header ? _header->header_size()
+                     : std::make_pair<uint64_t, uint8_t>(0, 0); }
 private:
     std::shared_ptr<SliceHeader> _header = nullptr;
     std::shared_ptr<SliceData> _slice_data = nullptr;

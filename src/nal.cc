@@ -36,12 +36,19 @@ NALUnit::NALUnit(BinaryReader & br, uint32_t size, bool unescape)
     }
 }
 
-NALUnit::NALUnit(std::string data): _nal_ref_idc(),
-                                    _nal_unit_type(), _data() {
+NALUnit::NALUnit(std::string data, bool unescape): _nal_ref_idc(),
+                                                   _nal_unit_type(), _data() {
     std::istringstream stream(data);
     BinaryReader br(stream);
     decode_header(br);
-    _data = br.read_bytes(data.length() - 1);
+    if (unescape) {
+        std::ostringstream s;
+        BinaryWriter bw(s);
+        unescape_rbsp(br, bw, data.length() - 1);
+        _data = s.str();
+    } else {
+        _data = br.read_bytes(data.length() - 1);
+    }
 }
 
 
@@ -52,13 +59,6 @@ void NALUnit::decode_header(BinaryReader & br) {
     _nal_ref_idc = tmp >> 5;
     _nal_unit_type = static_cast<uint8_t >(tmp & 0x1F);
 }
-
-
-SPS_NALUnit::SPS_NALUnit(std::string data) : NALUnit(std::move(data)),
-                                             _offset_for_ref_frame() {
-    parse();
-}
-
 
 void SPS_NALUnit::parse() {
     std::stringstream stream(_data);
@@ -117,6 +117,11 @@ void SPS_NALUnit::parse() {
     if (_vui_parameters_present_flag) {
         // not parsed yet
     }
+}
+
+SPS_NALUnit::SPS_NALUnit(std::string data) : NALUnit(std::move(data)),
+                                             _offset_for_ref_frame() {
+    parse();
 }
 
 SPS_NALUnit::SPS_NALUnit(NALUnit & unit) : NALUnit(unit),
@@ -293,8 +298,8 @@ void SliceHeader::parse(ParserContext &ctx) {
                            pps->slice_group_change_rate_minus1() + 1);
         slice_group_change_cycle = br.read_bits(bits);
     }
-
-    _header_size = br.pos();
+    _header_size[0] = br.pos();
+    _header_size[1] = br.bit_pos();
 }
 
 RefPicListModification::RefPicListModification()
@@ -431,8 +436,11 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
 void SliceData::parse(ParserContext & ctx) {
     std::string data = _nal.data();
     std::istringstream stream(data);
+    std::cout << std::dec << data.length() << std::endl;
     BinaryReader br(stream);
-    br.seek(_nal.header_size());
+    auto header_size = _nal.header_size();
+    br.seek(header_size.first);
+    br.set_bit_pos(header_size.second);
 
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
@@ -448,7 +456,7 @@ void SliceData::parse(ParserContext & ctx) {
         uint64_t mb_skip_run;
         if (header->slice_type != SliceType::TYPE_I
             && header->slice_type != SliceType::TYPE_SI) {
-            if (pps->entropy_coding_mode_flag()) {
+            if (!pps->entropy_coding_mode_flag()) {
                 mb_skip_run = br.read_ue();
                 prev_mb_skipped = mb_skip_run > 0;
                 for (uint64_t i = 0; i < mb_skip_run; i++ )
@@ -469,40 +477,40 @@ void SliceData::parse(ParserContext & ctx) {
             std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
                     (mb_field_decoding_flag, curr_mb_addr);
             ctx.mb = block;
-            ctx.mb->parse(ctx, br);
             ctx.mb_array[curr_mb_addr] = block;
+            ctx.mb->parse(ctx, br);
         }
         if (!pps->entropy_coding_mode_flag()) {
             more_data_flag = !br.eof();
-
         } else {
             throw NotImplemented("entropy_coding_mode_flag");
-            if (header->slice_type != SliceType::TYPE_I
-                && header->slice_type != SliceType::TYPE_SI) {
-                prev_mb_skipped = mb_skip_flag;
-                if (mbaff_frame_flag && curr_mb_addr % 2 == 0) {
-                    more_data_flag = true;
-                } else {
-                    /* TODO: not sure if that ae(v) is correct here */
-                    bool end_of_slice_flag = br.read_bit_as_bool();
-                    more_data_flag = !end_of_slice_flag;
-                }
-            }
+            //if (header->slice_type != SliceType::TYPE_I
+            //    && header->slice_type != SliceType::TYPE_SI) {
+            //    prev_mb_skipped = mb_skip_flag;
+            //    if (mbaff_frame_flag && curr_mb_addr % 2 == 0) {
+            //        more_data_flag = true;
+            //    } else {
+            //        /* TODO: not sure if that ae(v) is correct here */
+            //        bool end_of_slice_flag = br.read_bit_as_bool();
+            //        more_data_flag = !end_of_slice_flag;
+            //    }
+            //}
         }
         curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
     } while (more_data_flag);
 }
 
-uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext & ctx) {
-    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
-    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    std::shared_ptr<SliceHeader> header = ctx.header();
+uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext &) {
+    //std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    //std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    //std::shared_ptr<SliceHeader> header = ctx.header();
     /* Based on eqn 7-24 -> 7-28 and 8-16 */
-    uint64_t i = n + 1;
-    std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
-    while (i < ctx.PicSizeInMbs() && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
-        i++;
-    return i;
+    //uint64_t i = n + 1;
+    //std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
+    // while (i < ctx.PicSizeInMbs() && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
+    //    i++;
+    //return i;
+    return n + 1;
 }
 
 

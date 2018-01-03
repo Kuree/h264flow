@@ -119,4 +119,17 @@ int read_ce_runbefore(BinaryReader &br, const int vlcnum) {
                                   &runbefore_codtab[vlcnum][0], 16, 1);
 }
 
+void read_rbsp_trailing_bits(BinaryReader &br) {
+    uint8_t stop_bit =  br.read_bit();
+    if (!stop_bit)
+        throw std::runtime_error("stop bit is not 1");
+    br.reset_bit(true);
+}
+
+/* for debugging purpose */
+void log_binary_reader(std::string name, BinaryReader &br) {
+    std::cout << "[" << name << "] pos: " <<
+              br.pos() << " bit pos: " << (uint32_t)br.bit_pos() << std::endl;
+}
+
 #endif //H264FLOW_UTIL_HH
