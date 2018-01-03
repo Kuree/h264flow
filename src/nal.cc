@@ -629,7 +629,6 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
                 (mb_type != B_Direct_16x16
                  || sps->direct_8x8_inference_flag())) {
                 transform_size_8x8_flag = br.read_bit_as_bool();
-                throw NotImplemented("transform_size_8x8_flag");
             }
         }
         if (CodedBlockPatternLuma > 0 || CodedBlockPatternChroma > 0 ||

@@ -19,9 +19,25 @@
 
 #include "mp4.hh"
 
+class BitStream {
+public:
+    explicit BitStream(std::string filename);
+
+    ~BitStream() { _stream.close(); }
+
+    std::vector<std::pair<uint64_t, uint64_t>> chunk_offsets()
+    { return _chunk_offsets; }
+
+    std::string extract_stream(uint64_t position, uint64_t size);
+private:
+    std::ifstream _stream;
+    std::vector<std::pair<uint64_t, uint64_t>> _chunk_offsets;
+};
+
 class h264 {
 public:
     h264(std::shared_ptr<MP4File> mp4);
+    h264(std::shared_ptr<BitStream> stream);
 
     void index_nal();
     void load_frame(uint64_t frame_num);
@@ -32,7 +48,7 @@ private:
     std::shared_ptr<SPS_NALUnit> _sps = nullptr;
     std::shared_ptr<PPS_NALUnit> _pps = nullptr;
     std::shared_ptr<Box> _trak_box = nullptr;
-
+    std::shared_ptr<BitStream> _bit_stream = nullptr;
 };
 
 

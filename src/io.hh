@@ -81,6 +81,8 @@ private:
     uint8_t _bit_pos = 0;
     uint8_t _last_byte = 0;
 
+    uint64_t _size = 0; // avoid seeking on disk
+
     template<typename T> T read_raw(bool switch_endian) {
         size_t size = sizeof(T);
         std::string data = read_bytes(size);
@@ -110,5 +112,6 @@ private:
 };
 
 void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size = 0);
+bool search_nal(BinaryReader &br, bool skip_tag, uint32_t &tag_size);
 
 #endif //H264FLOW_IO_HH

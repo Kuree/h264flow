@@ -23,6 +23,8 @@ using std::runtime_error;
 using std::string;
 
 string BinaryReader::read_bytes(uint64_t num) {
+    if (pos() + num > size())
+        throw std::runtime_error("stream eof");
     std::vector<char> result(num);  // Because vector is guranteed to be contiguous in C++03
     _stream.read(&result[0], num);
 
@@ -30,10 +32,14 @@ string BinaryReader::read_bytes(uint64_t num) {
 }
 
 uint32_t BinaryReader::size() {
+    if (_size) {
+        return _size;
+    }
     uint32_t pos = this->pos();
     _stream.seekg(0, std::iostream::end);
     auto size = static_cast<uint32_t>(_stream.tellg());
     seek(pos);
+    _size = size;
     return size;
 }
 
@@ -65,6 +71,8 @@ int64_t BinaryReader::read_se() {
 }
 
 uint8_t BinaryReader::read_bit() {
+    if (_stream.eof())
+        throw std::runtime_error("stream eof");
     uint8_t tmp;
     if (bit_pos()) {
         tmp = _last_byte;
@@ -134,4 +142,29 @@ void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
         }
     }
     std::cout << std::dec << std::endl;
+}
+
+bool search_nal(BinaryReader &br, bool skip_tag, uint32_t & tag_size) {
+    if (br.pos() + 4 > br.size())
+        return false;
+    /* assume at the very biginning of the file it's 0x000001 */
+    uint8_t tmp1 = br.read_uint8();
+    uint8_t tmp2 = br.read_uint8();
+    uint8_t tmp3 = br.read_uint8();
+    uint8_t tmp4 = br.read_uint8();
+    while (br.size() != br.pos()) {
+        if (tmp2 == 0 && tmp3 == 0 && tmp4 == 1) {
+            /* we found one */
+            tag_size = tmp1 ? 3 : 4;
+            if (!skip_tag) {
+                br.seek(br.pos() - tag_size);
+            }
+            return true;
+        } else {
+            tmp2 = tmp3;
+            tmp3 = tmp4;
+            tmp4 = br.read_uint8();
+        }
+    }
+    return false;
 }
