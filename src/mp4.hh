@@ -44,6 +44,7 @@ public:
     uint32_t size() const { return _size; }
     std::string type() const { return _type; }
     std::string data() { return _data; }
+    uint64_t data_offset() { return _data_offset; }
 
     virtual void print(const uint32_t indent = 0);
     std::shared_ptr<Box> find_first(std::string type);
@@ -65,6 +66,9 @@ protected:
     uint64_t _data_start = 0;
 
     BinaryReader get_br(std::istream & stream);
+
+private:
+    uint64_t _data_offset = 0;
 };
 
 

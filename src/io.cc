@@ -25,13 +25,13 @@ using std::string;
 string BinaryReader::read_bytes(uint64_t num) {
     if (pos() + num > size())
         throw std::runtime_error("stream eof");
-    std::vector<char> result(num);  // Because vector is guranteed to be contiguous in C++03
+    std::vector<char> result(num);  // Because vector is guaranteed to be contiguous in C++03
     _stream.read(&result[0], num);
 
     return std::string(&result[0], &result[num]);
 }
 
-uint32_t BinaryReader::size() {
+uint64_t BinaryReader::size() {
     if (_size) {
         return _size;
     }

@@ -86,9 +86,30 @@ void h264::index_nal() {
     if (!box) box = _trak_box->find_first("co64");
     if (!box) throw std::runtime_error("stco/co64 not found");
     StcoBox stco = StcoBox(*box.get());
-    for (uint64_t offset : stco.chunk_offsets()) {
-        /* TODO: build a table from frame_num to a list of offsets */
-        _chunk_offsets.emplace_back(offset);
+    /* ffmpeg will produce broken stco sometimes */
+    if (stco.chunk_offsets().size() < 3) {
+        /* this will only happen when all the mdat data are used for NAT */
+        /* TODO: fix this with length size */
+        box = _mp4->find_first("mdat");
+        std::string str = _mp4->extract_stream(box->data_offset(), box->size());
+        std::istringstream stream(str);
+        BinaryReader br(stream);
+        uint64_t offset = box->data_offset();
+        _chunk_offsets.emplace_back(offset); /* the first one */
+        std::cout << std::hex << offset << std::endl;
+        while (!br.eof()) {
+            uint64_t size = read_nal_size(br);
+            if (!size) return;
+            offset += size;
+            _chunk_offsets.emplace_back(offset);
+            std::cout << "offset: " << std::hex << offset << " size: " << size << std::endl;
+            br.seek(br.pos() + size);
+        }
+    } else {
+        for (uint64_t offset : stco.chunk_offsets()) {
+            /* TODO: build a table from frame_num to a list of offsets */
+            _chunk_offsets.emplace_back(offset);
+        }
     }
 }
 
@@ -110,6 +131,24 @@ h264::h264(std::shared_ptr<BitStream> stream)
     }
 }
 
+uint64_t h264::read_nal_size(BinaryReader &br) {
+    uint32_t unit_size = 0;
+    if (_length_size == 4) {
+        unit_size = br.read_uint32();
+    } else if (_length_size == 3) {
+        uint32_t hi_byte = br.read_uint8();
+        uint32_t low_bits = br.read_uint16();
+        unit_size = hi_byte << 16 | low_bits;
+    } else if (_length_size == 2) {
+        unit_size = br.read_uint16();
+    } else if (_length_size == 1) {
+        unit_size = br.read_uint8();
+    } else {
+        throw std::runtime_error("unsupported length size");
+    }
+    return unit_size;
+}
+
 void h264::load_frame(uint64_t frame_num) {
     /* TODO: this is not actually frame_num, need to strip down slice_header
      * TODO: to obtain the actual frame_num (see TODO in index_nal()
@@ -126,20 +165,7 @@ void h264::load_frame(uint64_t frame_num) {
         std::string size_string = _mp4->extract_stream(offset, _length_size);
         std::istringstream stream(size_string);
         BinaryReader br(stream);
-        uint32_t unit_size = 0;
-        if (_length_size == 4) {
-            unit_size = br.read_uint32();
-        } else if (_length_size == 3) {
-            uint32_t hi_byte = br.read_uint8();
-            uint32_t low_bits = br.read_uint16();
-            unit_size = hi_byte << 16 | low_bits;
-        } else if (_length_size == 2) {
-            unit_size = br.read_uint16();
-        } else if (_length_size == 1) {
-            unit_size = br.read_uint8();
-        } else {
-            throw std::runtime_error("unsupported length size");
-        }
+        uint64_t unit_size = read_nal_size(br);
         nal_data = _mp4->extract_stream(offset + _length_size,
                                                     unit_size);
     }

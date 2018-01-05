@@ -67,7 +67,7 @@ public:
     uint64_t pos() { return (uint64_t)_stream.tellg(); }
     void seek(uint64_t pos) { _stream.seekg(pos); _bit_pos = 0; }
     bool eof() { return _stream.eof() || (pos() == size() && !_bit_pos); }
-    uint32_t size();
+    uint64_t size();
     void set_little_endian(bool endian) { _little_endian = endian; }
     bool little_endian() { return _little_endian; }
     void switch_stream(std::istream &stream)

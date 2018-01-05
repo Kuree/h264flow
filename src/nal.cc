@@ -294,8 +294,12 @@ void SliceHeader::parse(ParserContext &ctx) {
 
     if (pps->num_slice_groups_minus1() > 0 && pps->slice_group_map_type() >= 3
         && pps->slice_group_map_type() <= 5) {
-        uint64_t bits = intlog2(pps->pic_size_in_map_units_minus1() +
-                           pps->slice_group_change_rate_minus1() + 1);
+        uint64_t pic_size_in_map_units = pps->pic_size_in_map_units_minus1()
+                                         + 1;
+        uint64_t slice_group_change_rate =
+                pps->slice_group_change_rate_minus1() + 1;
+        uint64_t bits = intlog2(pic_size_in_map_units /
+                                        slice_group_change_rate + 1);
         slice_group_change_cycle = br.read_bits(bits);
     }
     _header_size[0] = br.pos();
@@ -469,7 +473,7 @@ void SliceData::parse(ParserContext & ctx) {
             }
         }
         if (more_data_flag) {
-            bool mb_field_decoding_flag = true;
+            bool mb_field_decoding_flag = false;
             if (mbaff_frame_flag && (curr_mb_addr % 2 == 0
                                      || (curr_mb_addr % 2 == 1
                                          && prev_mb_skipped)))
@@ -595,11 +599,17 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
             br.read_bits(bit_depth_chroma);
     } else {
         bool noSubMbPartSizeLessThan8x8Flag = true;
-        if (MbPartPredMode(mb_type, 0, header->slice_type) != Intra_4x4
+        if (mb_type != I_NxN
             && MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16
             && NumMbPart(mb_type) == 4) {
             auto sub_mb_pred = std::make_shared<SubMbPred>();
             sub_mb_pred->parse(ctx, br);
+            for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++ ) {
+                if (sub_mb_pred->sub_mb_type[mbPartIdx] != B_Direct_8x8)
+                    noSubMbPartSizeLessThan8x8Flag = false;
+                else if (!sps->direct_8x8_inference_flag())
+                    noSubMbPartSizeLessThan8x8Flag = false;
+            }
         } else {
             if (pps->transform_8x8_mode_flag() && mb_type == I_NxN) {
                 /* Note: this is only true for !entropy */
@@ -688,7 +698,7 @@ void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
         }
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
-    } else {
+    } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) != Direct){
         uint64_t num_mb_part = NumMbPart(mb->mb_type);
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
             if ((header->num_ref_idx_l0_active_minus1 > 0 ||
@@ -1246,6 +1256,6 @@ uint32_t ParserContext::SubWidthC() {
 }
 
 void ParserContext::set_header(std::shared_ptr<SliceHeader> header) {
-    _header = header;
+    _header = std::move(header);
     mb_array = std::vector<std::shared_ptr<MacroBlock>>(PicSizeInMbs());
 }

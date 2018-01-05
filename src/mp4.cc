@@ -33,6 +33,8 @@ Box::Box(BinaryReader &br, bool read_data) : _data(), _size(), _type(),
     _size = br.read_uint32(true);
     _type = br.read_bytes(4);
 
+    _data_offset = br.pos(); /* used to get data from mp4 stream */
+
     if (mp4_container_boxes.find(_type) != mp4_container_boxes.end()) {
         uint64_t end_pos = br.pos() + _size - 8;
         while (br.pos() < end_pos) {
