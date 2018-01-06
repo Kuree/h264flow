@@ -171,7 +171,9 @@ private:
     uint8_t _flags = 0;
     uint8_t _level_idc = 0;
     uint64_t _sps_id = 0;
-    uint64_t _chroma_format_idc = 0;
+    /* chroma_format_idc is not present, it shall be
+     * inferred to be equal to 1 (4:2:0 chroma format). */
+    uint64_t _chroma_format_idc = 1;
     bool _separate_colour_plane_flag = false;
     uint64_t _bit_depth_luma_minus8 = 0;
     uint64_t _bit_depth_chroma_minus8 = 0;

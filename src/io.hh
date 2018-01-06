@@ -73,6 +73,7 @@ public:
     void switch_stream(std::istream &stream)
     { _stream.rdbuf(stream.rdbuf()); seek(0); }
 
+    std::string print_bit_pos(uint64_t offset = 0);
     ~BinaryReader() = default;
 
 private:

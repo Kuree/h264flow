@@ -187,10 +187,10 @@ void PPS_NALUnit::parse() {
     _constrained_intra_pred_flag = br.read_bit_as_bool();
     _redundant_pic_cnt_present_flag = br.read_bit_as_bool();
     if (!br.eof()) {
-        _transform_8x8_mode_flag = br.read_bit_as_bool();
-        _pic_scaling_matrix_present_flag = br.read_bit_as_bool();
-        if (_pic_scaling_matrix_present_flag)
-            throw NotImplemented("pic_scaling_matrix_present_flag");
+        //_transform_8x8_mode_flag = br.read_bit_as_bool();
+        //_pic_scaling_matrix_present_flag = br.read_bit_as_bool();
+        //if (_pic_scaling_matrix_present_flag)
+        //    throw NotImplemented("pic_scaling_matrix_present_flag");
         /* the rest is not parsed */
     }
 
@@ -627,9 +627,10 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
             uint64_t coded_block_pattern = br.read_ue();
             if (coded_block_pattern > 47)
                 throw std::runtime_error("incorrect coded block pattern");
-            coded_block_pattern =
-                    (uint64_t)codeNum_to_coded_block_pattern_intra[
-                            coded_block_pattern];
+            coded_block_pattern = MbPartPredMode(mb_type, 0, header->slice_type) == Intra_4x4?
+                    codeNum_to_coded_block_pattern_intra[coded_block_pattern] :
+                                  codeNum_to_coded_block_pattern_inter[
+                                          coded_block_pattern];
             CodedBlockPatternLuma = coded_block_pattern % 16;
             CodedBlockPatternChroma = coded_block_pattern / 16;
 
@@ -784,11 +785,8 @@ void Residual::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     // residual_block_cavlc
-    if (start_index == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
-                            == Intra_16x16) {
-        residual_luma(ctx, 0, 15, br);
-        residual_chroma(ctx, 0, 15, br);
-    }
+    residual_luma(ctx, 0, 15, br);
+    residual_chroma(ctx, 0, 15, br);
 }
 
 void Residual::residual_luma(ParserContext &ctx, const int startIdx,
@@ -1029,14 +1027,14 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
     uint8_t TotalCoeffs   = coeff_token >> 2;
     uint8_t TrailingOnes = coeff_token % 4;
 
-    if ((int)block_type < 4)
+    if (static_cast<uint32_t>(block_type) < 4)
         mb->TotalCoeffs_luma[block_index] = TotalCoeffs;
     else if (block_type == BlockType::blk_CHROMA_AC_Cb)
         mb->TotalCoeffs_chroma[0][block_index] = TotalCoeffs;
     else if (block_type == BlockType::blk_CHROMA_AC_Cr)
         mb->TotalCoeffs_chroma[1][block_index] = TotalCoeffs;
-    else
-        throw std::runtime_error("Could not save TotalCoeffs");
+    //else
+    //    throw std::runtime_error("Could not save TotalCoeffs");
 
     if (TotalCoeffs > 0 && TotalCoeffs <= max_num_coeff) {
         // 9.2.2 Parsing process for level information

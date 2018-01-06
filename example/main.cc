@@ -7,7 +7,7 @@
 using namespace std;
 
 int main(int , char * []) {
-    auto mp4 = make_shared<MP4File>("news.mp4");
-    h264 decoder(mp4);
-    decoder.load_frame(3);
+    auto bs = make_shared<BitStream>("news.264");
+    h264 decoder(bs);
+    decoder.load_frame(4);
 }

@@ -100,6 +100,12 @@ uint64_t BinaryReader::read_bits(uint64_t bits) {
     return result;
 }
 
+std::string BinaryReader::print_bit_pos(uint64_t offset) {
+    std::ostringstream stream;
+    stream << "bit pos: " << offset + pos() * 8 + _bit_pos;
+    return stream.str();
+}
+
 uint64_t BinaryReader::next_bits(uint64_t bits) {
     uint64_t _pos = pos();
     uint8_t bit_pos = _bit_pos;
