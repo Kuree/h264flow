@@ -15,6 +15,8 @@
  */
 
 #include "h264.hh"
+#include "consts.hh"
+#include "util.hh"
 #include <sstream>
 #include <experimental/filesystem>
 
@@ -172,4 +174,34 @@ void h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(_sps, _pps);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
+}
+
+void h264::process_inter_mb(ParserContext &ctx) {
+    /* Section 8.4 */
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    uint64_t mb_type = mb->mb_type;
+    uint64_t numMbPart = NumMbPart(mb_type);
+    /* baseline profile won't have B slice */
+    if (mb->slice_type == SliceType::TYPE_B)
+        throw NotImplemented("B Slice");
+    for (uint32_t mbPartIdx = 0; mbPartIdx < numMbPart; mbPartIdx++) {
+        uint64_t partWidth = 0;
+        uint64_t partHeight = 0;
+        uint64_t numSubMbParts = 0;
+        if (mb_type != P_8x8 && mb_type != P_8x8ref0) {
+            numSubMbParts = 1;
+            partWidth = MbPartWidth(mb_type);
+            partHeight = MbPartHeight(mb_type);
+        } else if (mb_type == P_8x8 || mb_type == P_8x8ref0) {
+            throw NotImplemented("numSubMbParts");
+        } else {
+            partWidth = 4;
+            partHeight = 4;
+            numSubMbParts = 4;
+        }
+        uint64_t partWidthC = partWidth / ctx.SubWidthC();
+        uint64_t partHeightC = partHeight / ctx.SubHeightC();
+
+        uint64_t MvCnt = 0;
+    }
 }

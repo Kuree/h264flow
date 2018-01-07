@@ -629,6 +629,7 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
     /* compute neighbours */
     compute_mb_neighbours(sps);
     assign_pos(ctx);
+    slice_type = header->slice_type;
 
     mb_type = br.read_ue();
     if (mb_type == I_PCM) {

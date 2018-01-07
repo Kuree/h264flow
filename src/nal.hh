@@ -529,6 +529,8 @@ public:
     uint64_t CodedBlockPatternLuma = 0;
     uint64_t CodedBlockPatternChroma = 0;
 
+    uint64_t slice_type = 0; /* will be assigned in parsing */
+
 private:
     void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);
     void assign_pos(ParserContext & ctx);

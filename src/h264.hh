@@ -51,6 +51,8 @@ private:
     std::shared_ptr<BitStream> _bit_stream = nullptr;
 
     uint64_t read_nal_size(BinaryReader &br);
+
+    void process_inter_mb(ParserContext &ctx);
 };
 
 

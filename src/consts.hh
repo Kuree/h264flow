@@ -77,13 +77,37 @@ along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
 #define B_L1_4x4        11
 #define B_Bi_4x4        12
 
+/* copied from MiniVideo. value maybe wrong */
+#define B_Direct_16x16       0
+#define   B_L0_16x16         1
+#define   B_L1_16x16         2
+#define   B_Bi_16x16         3
+#define   B_L0_L0_16x8       4
+#define   B_L0_L0_8x16       5
+#define   B_L1_L1_16x8       6
+#define   B_L1_L1_8x16       7
+#define   B_L0_L1_16x8       8
+#define   B_L0_L1_8x16       9
+#define   B_L1_L0_16x8       10
+#define   B_L1_L0_8x16       11
+#define   B_L0_Bi_16x8       12
+#define   B_L0_Bi_8x16       13
+#define   B_L1_Bi_16x8       14
+#define   B_L1_Bi_8x16       15
+#define   B_Bi_L0_16x8       16
+#define   B_Bi_L0_8x16       17
+#define   B_Bi_L1_16x8       18
+#define   B_Bi_L1_8x16       19
+#define   B_Bi_Bi_16x8       20
+#define   B_Bi_Bi_8x16       21
+#define   B_8x8              22
+#define   B_Skip             23  // 23
 
-#define B_Skip         0
-#define B_Direct_16x16 0
+
 #define B_16x16        1
 #define B_16x8         2
 #define B_8x16         3
-#define B_8x8          4
+//#define B_8x8          4
 #define B_8x4          5
 #define B_4x8          6
 #define B_4x4          7
@@ -247,6 +271,14 @@ int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
 
 uint64_t NumMbPart(uint64_t mb_type) {
     return P_and_SP_macroblock_modes[mb_type][2];
+}
+
+uint64_t MbPartWidth(uint64_t mb_type) {
+    return P_and_SP_macroblock_modes[mb_type][5];
+}
+
+uint64_t MbPartHeight(uint64_t mb_type) {
+    return P_and_SP_macroblock_modes[mb_type][6];
 }
 
 uint8_t codeNum_to_coded_block_pattern_intra[48]= {
