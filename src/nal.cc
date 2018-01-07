@@ -437,8 +437,32 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
     }
 }
 
+void SliceData::find_trailing_bit(std::string &data) {
+    std::istringstream stream(data);
+    BinaryReader br(stream);
+    uint64_t pos = br.size() - 1;
+    /* search from the back */
+    while (true) {
+        br.seek(pos);
+        uint8_t  tmp = br.read_uint8();
+        for (int i = 0; i < 8; i++) {
+            if (tmp & (1 << i)) {
+                _trailing_bit = pos * 8 + (7 - i);
+                return;
+            }
+        }
+        pos--;
+    }
+
+}
+
+bool SliceData::more_rbsp_data(BinaryReader &br) {
+    return (br.pos() * 8 + br.bit_pos()) < _trailing_bit;
+}
+
 void SliceData::parse(ParserContext & ctx) {
     std::string data = _nal.data();
+    find_trailing_bit(data);
     std::istringstream stream(data);
     std::cout << std::dec << data.length() << std::endl;
     BinaryReader br(stream);
@@ -489,7 +513,7 @@ void SliceData::parse(ParserContext & ctx) {
             ctx.mb->parse(ctx, br);
         }
         if (!pps->entropy_coding_mode_flag()) {
-            more_data_flag = !br.eof();
+            more_data_flag = more_rbsp_data(br);
         } else {
             throw NotImplemented("entropy_coding_mode_flag");
             //if (header->slice_type != SliceType::TYPE_I

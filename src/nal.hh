@@ -88,7 +88,7 @@ public:
 
     bool idr_pic_flag() const { return _nal_unit_type == 5; }
     /* TODO: fix this */
-    std::string data() const { return _data; }
+    const std::string data() const { return _data; }
 
     virtual ~NALUnit() = default;
 
@@ -390,7 +390,9 @@ private:
     std::vector<uint64_t> slice_group_map(std::shared_ptr<SPS_NALUnit> sps,
                                           std::shared_ptr<PPS_NALUnit> pps);
 
-    bool more_rbsp_data(BinaryReader & br) { return !br.eof(); }
+    bool more_rbsp_data(BinaryReader & br);
+    void find_trailing_bit(std::string &data);
+    uint64_t _trailing_bit = 0;
 };
 
 
