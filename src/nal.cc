@@ -641,9 +641,26 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
                  || sps->direct_8x8_inference_flag())) {
                 transform_size_8x8_flag = br.read_bit_as_bool();
             }
+        } else if (header->slice_type == SliceType::TYPE_I && mb_type > 4){
+            /* TODO: this is only a temporary fix. clean this up */
+            if (mb_type > 12) {
+                CodedBlockPatternLuma = 15;
+                if (mb_type > 20)
+                    CodedBlockPatternChroma = 2;
+                else if (mb_type > 16)
+                    CodedBlockPatternChroma = 1;
+            } else {
+                 if (mb_type > 8)
+                     CodedBlockPatternChroma = 2;
+                 else if (mb_type > 4)
+                     CodedBlockPatternChroma = 1;
+            }
         }
+
+        uint64_t mb_part = MbPartPredMode(mb_type, 0, header->slice_type);
+        bool is_intra_16 = mb_part == Intra_16x16;
         if (CodedBlockPatternLuma > 0 || CodedBlockPatternChroma > 0 ||
-            MbPartPredMode(mb_type, 0, header->slice_type) == Intra_16x16) {
+                is_intra_16) {
             mb_qp_delta = br.read_se();
             /* residual here */
             residual = std::make_shared<Residual>(0, 15);
@@ -837,8 +854,7 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
                             residual_blocks.emplace_back(block);
                         }
                     }
-                } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type)
-                           == Intra_16x16) {
+                } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) == 1) {
                     for (int i = 0; i < 15; i++) {
                         mb->Intra16x16ACLevel[blkIdx][i] = 0;
                         mb->TotalCoeffs_luma[blkIdx] = 0;
@@ -882,6 +898,11 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
                                const int endIdx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<MacroBlock> mb = ctx.mb;
+
+    /* FIXME: this is a hack to make it the same with JM reference player */
+    if (mb->mb_preds.size() && mb->mb_preds[0]->intra_chroma_pred_mode)
+        mb->CodedBlockPatternChroma = 3;
+
     uint64_t chroma_array_type = sps->chroma_array_type();
     if (chroma_array_type == 1 || chroma_array_type == 2) {
         int NumC8x8 = 4 / (ctx.SubWidthC() * ctx.SubHeightC());

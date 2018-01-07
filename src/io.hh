@@ -83,6 +83,7 @@ private:
     uint8_t _last_byte = 0;
 
     uint64_t _size = 0; // avoid seeking on disk
+    bool _has_bit_read = false;
 
     template<typename T> T read_raw(bool switch_endian) {
         size_t size = sizeof(T);

@@ -71,22 +71,31 @@ int64_t BinaryReader::read_se() {
 }
 
 uint8_t BinaryReader::read_bit() {
-    if (_stream.eof())
+     if (_stream.eof())
         throw std::runtime_error("stream eof");
     uint8_t tmp;
-    if (bit_pos()) {
+    if (_bit_pos && _bit_pos != 8) {
         tmp = _last_byte;
     } else {
         tmp = read_uint8();
         _last_byte = tmp;
+        _bit_pos = 0;
     }
+    tmp = static_cast<uint8_t>((tmp >> (7 - _bit_pos)) & 1);
+    _bit_pos++;
+    return tmp;
+
+    /*uint64_t _pos = pos();
+    uint8_t tmp = read_uint8();
     tmp = static_cast<uint8_t>((tmp >> (7 - _bit_pos)) & 1);
     if (_bit_pos % 8 == 7) {
         _bit_pos = 0;
     } else {
         _bit_pos++;
+        _stream.seekg(_pos);
     }
     return tmp;
+    */
 }
 
 uint64_t BinaryReader::read_bits(uint64_t bits) {
@@ -109,9 +118,11 @@ std::string BinaryReader::print_bit_pos(uint64_t offset) {
 uint64_t BinaryReader::next_bits(uint64_t bits) {
     uint64_t _pos = pos();
     uint8_t bit_pos = _bit_pos;
+    uint8_t last_byte = _last_byte;
     uint64_t result = read_bits(bits);
-    seek(_pos); /* this one will reset _bit_pos to 0 */
+    _stream.seekg(_pos); /* this one will reset _bit_pos to 0 */
     _bit_pos = bit_pos;
+    _last_byte = last_byte;
     return result;
 }
 
