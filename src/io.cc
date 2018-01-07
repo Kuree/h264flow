@@ -158,7 +158,6 @@ void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
             }
         }
     }
-    std::cout << std::dec << std::endl;
 }
 
 bool search_nal(BinaryReader &br, bool skip_tag, uint32_t & tag_size) {

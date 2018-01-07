@@ -172,6 +172,4 @@ void h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(_sps, _pps);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
-    auto header = slice.header();
-    std::cout << header->frame_num << " " << header->slice_qp_delta << std::endl;
 }

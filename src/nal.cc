@@ -464,7 +464,6 @@ void SliceData::parse(ParserContext & ctx) {
     std::string data = _nal.data();
     find_trailing_bit(data);
     std::istringstream stream(data);
-    std::cout << std::dec << data.length() << std::endl;
     BinaryReader br(stream);
     auto header_size = _nal.header_size();
     br.seek(header_size.first);
@@ -519,7 +518,7 @@ void SliceData::parse(ParserContext & ctx) {
             //if (header->slice_type != SliceType::TYPE_I
             //    && header->slice_type != SliceType::TYPE_SI) {
             //    prev_mb_skipped = mb_skip_flag;
-            //    if (mbaff_frame_flag && curr_mb_addr % 2 == 0) {
+            //    if (mbaff_frame_flag && mb_addr % 2 == 0) {
             //        more_data_flag = true;
             //    } else {
             //        /* TODO: not sure if that ae(v) is correct here */
@@ -596,7 +595,7 @@ std::vector<uint64_t> SliceData::slice_group_map(
 MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
         : mb_preds(), sub_mb_preds(),
           mb_field_decoding_flag(mb_field_decoding_flag),
-          curr_mb_addr(curr_mb_addr) {
+          mb_addr(curr_mb_addr) {
     for (int i = 0; i < 16; i++)
         TotalCoeffs_luma[i] = 0;
     for (int i = 0; i < 4; i++) {
@@ -629,6 +628,7 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
     std::shared_ptr<SliceHeader> header = ctx.header();
     /* compute neighbours */
     compute_mb_neighbours(sps);
+    assign_pos(ctx);
 
     mb_type = br.read_ue();
     if (mb_type == I_PCM) {
@@ -717,25 +717,35 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
 
 void MacroBlock::compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps) {
     uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
-    if (curr_mb_addr % PicWidthInMbs != 0)
-        mbAddrA = curr_mb_addr - 1;
+    if (mb_addr % PicWidthInMbs != 0)
+        mbAddrA = mb_addr - 1;
     else
         mbAddrA = -1;
 
-    if (curr_mb_addr >= PicWidthInMbs)
-        mbAddrB = curr_mb_addr - PicWidthInMbs;
+    if (mb_addr >= PicWidthInMbs)
+        mbAddrB = mb_addr - PicWidthInMbs;
     else
         mbAddrB = -1;
-    if (curr_mb_addr >= PicWidthInMbs &&
-        (curr_mb_addr + 1) % PicWidthInMbs != 0) {
-        mbAddrC = curr_mb_addr - PicWidthInMbs + 1;
+    if (mb_addr >= PicWidthInMbs &&
+        (mb_addr + 1) % PicWidthInMbs != 0) {
+        mbAddrC = mb_addr - PicWidthInMbs + 1;
     } else
         mbAddrC = -1;
-    if (curr_mb_addr > PicWidthInMbs &&
-        curr_mb_addr % PicWidthInMbs != 0) {
-        mbAddrD = curr_mb_addr - PicWidthInMbs - 1;
+    if (mb_addr > PicWidthInMbs &&
+        mb_addr % PicWidthInMbs != 0) {
+        mbAddrD = mb_addr - PicWidthInMbs - 1;
     } else
         mbAddrD = -1;
+}
+
+void MacroBlock::assign_pos(ParserContext & ctx) {
+    uint64_t PicWidthInMbs = ctx.PicWidthInMbs();
+    uint64_t FrameHeightInMbs = ctx.FrameHeightInMbs();
+    if (mb_addr <= (PicWidthInMbs * FrameHeightInMbs)) {
+        _pos_x = mb_addr % PicWidthInMbs;
+        _pos_y = mb_addr / PicWidthInMbs;
+    } else
+        throw std::runtime_error("mb_addr out of range");
 }
 
 MbPred::MbPred() {
@@ -1257,7 +1267,7 @@ void ResidualBlock::deriv_neighbouringlocations(ParserContext &ctx, const bool l
         if (xN < 0)
             mbAddrN = mb->mbAddrA;
         else if (xN < maxW)
-            mbAddrN = (int)mb->curr_mb_addr;
+            mbAddrN = (int)mb->mb_addr;
         else
             return;
     } else {

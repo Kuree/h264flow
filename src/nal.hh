@@ -509,11 +509,11 @@ public:
     std::shared_ptr<Residual> residual = nullptr;
     bool mb_field_decoding_flag;
     int64_t mb_qp_delta = 0;
-    uint64_t curr_mb_addr;
-    int32_t mbAddrA = -1;
-    int32_t mbAddrB = -1;
-    int32_t mbAddrC = -1;
-    int32_t mbAddrD = -1;
+    uint64_t mb_addr;
+    int64_t mbAddrA = -1;
+    int64_t mbAddrB = -1;
+    int64_t mbAddrC = -1;
+    int64_t mbAddrD = -1;
 
     int TotalCoeffs_luma[16];
     int TotalCoeffs_chroma[2][4];
@@ -531,6 +531,10 @@ public:
 
 private:
     void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);
+    void assign_pos(ParserContext & ctx);
+
+    uint64_t _pos_x = 0;
+    uint64_t _pos_y = 0;
 
 };
 
