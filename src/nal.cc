@@ -463,8 +463,12 @@ void SliceData::parse(ParserContext & ctx) {
             if (!pps->entropy_coding_mode_flag()) {
                 mb_skip_run = br.read_ue();
                 prev_mb_skipped = mb_skip_run > 0;
-                for (uint64_t i = 0; i < mb_skip_run; i++ )
+                for (uint64_t i = 0; i < mb_skip_run; i++ ) {
+                    std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
+                            (false, curr_mb_addr);
+                    ctx.mb_array[curr_mb_addr] = block;
                     curr_mb_addr = next_mb_addr(curr_mb_addr, ctx);
+                }
                 if (mb_skip_run > 0)
                     more_data_flag = more_rbsp_data(br);
             } else {
@@ -569,13 +573,30 @@ MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
         : mb_preds(), sub_mb_preds(),
           mb_field_decoding_flag(mb_field_decoding_flag),
           curr_mb_addr(curr_mb_addr) {
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 16; i++)
         TotalCoeffs_luma[i] = 0;
-    }
     for (int i = 0; i < 4; i++) {
         TotalCoeffs_chroma[0][i] = 0;
         TotalCoeffs_chroma[1][i] = 0;
     }
+    for (int i = 0; i < 16; i++)
+        for (int j = 0; j < 16; j++)
+            LumaLevel4x4[i][j] = 0;
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 64; j++)
+            LumaLevel8x8[i][j] = 0;
+    for (int i = 0; i < 16; i++)
+        Intra16x16DCLevel[i] = 0;
+    for (int i = 0; i < 16; i++)
+        for (int j = 0; j < 15; j++)
+            Intra16x16ACLevel[i][j] = 0;
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 4; j++)
+            ChromaDCLevel[i][j] = 0;
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 4; j++)
+            for (int k = 0; k < 15; k++)
+                ChromaACLevel[i][j][k] = 0;
 }
 
 void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
@@ -672,20 +693,25 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
 
 void MacroBlock::compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps) {
     uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
-    if (curr_mb_addr % PicWidthInMbs != 0) {
+    if (curr_mb_addr % PicWidthInMbs != 0)
         mbAddrA = curr_mb_addr - 1;
-    }
-    if (curr_mb_addr >= PicWidthInMbs) {
+    else
+        mbAddrA = -1;
+
+    if (curr_mb_addr >= PicWidthInMbs)
         mbAddrB = curr_mb_addr - PicWidthInMbs;
-    }
+    else
+        mbAddrB = -1;
     if (curr_mb_addr >= PicWidthInMbs &&
         (curr_mb_addr + 1) % PicWidthInMbs != 0) {
         mbAddrC = curr_mb_addr - PicWidthInMbs + 1;
-    }
+    } else
+        mbAddrC = -1;
     if (curr_mb_addr > PicWidthInMbs &&
         curr_mb_addr % PicWidthInMbs != 0) {
         mbAddrD = curr_mb_addr - PicWidthInMbs - 1;
-    }
+    } else
+        mbAddrD = -1;
 }
 
 MbPred::MbPred() {
