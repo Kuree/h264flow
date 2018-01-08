@@ -143,8 +143,7 @@ uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type) {
 
 
 int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
-
-    return (slice_type % 5 == 0) ?
+    return (slice_type == SliceType::TYPE_P) ?
            P_and_SP_macroblock_modes[mb_type][3 + (x % 2)] :
            I_Macroblock_Modes[mb_type][3];
 }
