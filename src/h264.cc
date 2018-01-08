@@ -186,6 +186,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
         throw NotImplemented("chroma_array_type != 1");
     /* Section 8.4 */
     for (const auto & mb : ctx.mb_array) {
+        ctx.mb = mb;
         uint64_t mb_type = mb->mb_type;
         uint64_t slice_type = ctx.header()->slice_type;
         uint64_t numMbPart = NumMbPart(mb_type);
@@ -402,6 +403,14 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             _mvs[i][j] = mv;
         }
     }
+}
+
+MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
+                 uint32_t mb_height) : _height(pic_height), _width(pic_width),
+                                       _mb_width(mb_width),
+                                       _mb_height(mb_height), _mvs() {
+    _mvs = std::vector<std::vector<MotionVector>>(_height,
+                                                  std::vector<MotionVector>(_width));
 }
 
 MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) {

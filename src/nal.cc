@@ -530,6 +530,9 @@ void SliceData::parse(ParserContext & ctx) {
         }
         curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
     } while (more_data_flag);
+    /* sanity check */
+    if (curr_mb_addr != ctx.PicSizeInMbs() + 1)
+        throw std::runtime_error("slice data parsing unfinished");
 }
 
 uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext &) {
@@ -597,30 +600,14 @@ MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
         : mb_preds(), sub_mb_preds(),
           mb_field_decoding_flag(mb_field_decoding_flag),
           mb_addr(curr_mb_addr) {
-    for (int i = 0; i < 16; i++)
-        TotalCoeffs_luma[i] = 0;
-    for (int i = 0; i < 4; i++) {
-        TotalCoeffs_chroma[0][i] = 0;
-        TotalCoeffs_chroma[1][i] = 0;
-    }
-    for (int i = 0; i < 16; i++)
-        for (int j = 0; j < 16; j++)
-            LumaLevel4x4[i][j] = 0;
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 64; j++)
-            LumaLevel8x8[i][j] = 0;
-    for (int i = 0; i < 16; i++)
-        Intra16x16DCLevel[i] = 0;
-    for (int i = 0; i < 16; i++)
-        for (int j = 0; j < 15; j++)
-            Intra16x16ACLevel[i][j] = 0;
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 4; j++)
-            ChromaDCLevel[i][j] = 0;
-    for (int i = 0; i < 2; i++)
-        for (int j = 0; j < 4; j++)
-            for (int k = 0; k < 15; k++)
-                ChromaACLevel[i][j][k] = 0;
+    memset(TotalCoeffs_luma, 0, sizeof(int) * 16);
+    memset(TotalCoeffs_chroma, 0, sizeof(int) * 8); /* 4 * 2 */
+    memset(LumaLevel4x4, 0, sizeof(int) * 256); /* 16 * 16 */
+    memset(LumaLevel8x8, 0, sizeof(int) * 256); /* 4 * 64 */
+    memset(Intra16x16DCLevel, 0, sizeof(int) * 16);
+    memset(Intra16x16ACLevel, 0, sizeof(int) * 240); /* 16 * 15 */
+    memset(ChromaDCLevel, 0, sizeof(int) * 8);
+    memset(ChromaACLevel, 0, sizeof(int) * 120); /* 2 * 4 * 15 */
 
     memset(mvL, 0, sizeof(int) * 64);  /* 2 * 4 * 4 * 2 */
     memset(predFlagL, 0, sizeof(int) * 8);  /* 2 * 4 */
@@ -792,7 +779,7 @@ void MacroBlock::compute_mb_index(ParserContext &ctx) {
         *addr_index[i] = mb->mbPartIdxTable[x][y];
     }
 
-    if ((mb_type == Intra_16x16 || Intra_4x4) && mbAddrC == -1) {
+    if ((mb_type == Intra_16x16 || mb_type == Intra_4x4) && mbAddrC == -1) {
         mbPartIdxC = mbPartIdxD;
     }
 }

@@ -18,6 +18,7 @@
 #define H264FLOW_H264_HH
 
 #include "mp4.hh"
+#include "util.hh"
 
 class BitStream {
 public:
@@ -42,6 +43,8 @@ struct MotionVector {
 class MvFrame {
 public:
     explicit MvFrame(ParserContext &ctx);
+    MvFrame(uint32_t pic_width, uint32_t pic_height,uint32_t mb_width,
+            uint32_t mb_height);
     MotionVector get_mv(uint32_t mb_addr);
     MotionVector get_mv(uint32_t x, uint32_t y);
     std::vector<std::vector<MotionVector>> get_all_mvs()
