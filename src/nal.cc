@@ -14,10 +14,11 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "nal.hh"
-#include "util.hh"
 #include <sstream>
 #include <algorithm>
+#include "nal.hh"
+#include "util.hh"
+#include "consts.hh"
 
 using std::shared_ptr;
 using std::make_shared;
@@ -488,7 +489,7 @@ void SliceData::parse(ParserContext & ctx) {
                 prev_mb_skipped = mb_skip_run > 0;
                 for (uint64_t i = 0; i < mb_skip_run; i++ ) {
                     std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
-                            (false, curr_mb_addr);
+                            (ctx, false, curr_mb_addr);
                     ctx.mb_array[curr_mb_addr] = block;
                     curr_mb_addr = next_mb_addr(curr_mb_addr, ctx);
                 }
@@ -506,7 +507,7 @@ void SliceData::parse(ParserContext & ctx) {
                                          && prev_mb_skipped)))
                 mb_field_decoding_flag = br.read_bit_as_bool();
             std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
-                    (mb_field_decoding_flag, curr_mb_addr);
+                    (ctx, mb_field_decoding_flag, curr_mb_addr);
             ctx.mb = block;
             ctx.mb_array[curr_mb_addr] = block;
             ctx.mb->parse(ctx, br);
@@ -620,15 +621,24 @@ MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
         for (int j = 0; j < 4; j++)
             for (int k = 0; k < 15; k++)
                 ChromaACLevel[i][j][k] = 0;
+
+    memset(mvL, 0, sizeof(int) * 64);  /* 2 * 4 * 4 * 2 */
+    memset(predFlagL, 0, sizeof(int) * 8);  /* 2 * 4 */
+    memset(refIdxL, 0, sizeof(int) * 8);  /* 2 * 4 */
+}
+
+MacroBlock::MacroBlock(ParserContext &ctx, bool mb_field_decoding_flag,
+                       uint64_t curr_mb_addr) :
+        MacroBlock(mb_field_decoding_flag, curr_mb_addr) {
+    /* compute neighbours */
+    compute_mb_neighbours(ctx);
+    assign_pos(ctx);
 }
 
 void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
-    /* compute neighbours */
-    compute_mb_neighbours(sps);
-    assign_pos(ctx);
     slice_type = header->slice_type;
 
     mb_type = br.read_ue();
@@ -714,9 +724,12 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
         }
 
     }
+    /* based on mb_type */
+    compute_mb_index(ctx);
 }
 
-void MacroBlock::compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps) {
+void MacroBlock::compute_mb_neighbours(ParserContext &ctx) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     uint64_t PicWidthInMbs = sps->pic_width_in_mbs_minus1() + 1;
     if (mb_addr % PicWidthInMbs != 0)
         mbAddrA = mb_addr - 1;
@@ -737,6 +750,51 @@ void MacroBlock::compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps) {
         mbAddrD = mb_addr - PicWidthInMbs - 1;
     } else
         mbAddrD = -1;
+    /* will be overridden for non-skipped mb */
+    compute_mb_index(ctx);
+}
+
+void MacroBlock::compute_mb_index(ParserContext &ctx) {
+    /* compute MbPartIdx table */
+    uint64_t numMbPart = NumMbPart(mb_type);
+    if (numMbPart == 4)
+        throw NotImplemented("numMbPart == 4");
+    for (uint32_t mbPartIdx = 0; mbPartIdx < numMbPart; mbPartIdx++) {
+        int x = 0; int y = 0;
+        if (numMbPart == 2) {
+            if (MbPartWidth(mb_type) == 8) {
+                x = 8; y = 0;
+            } else {
+                x = 0; y = 8;
+            }
+        }
+        x /= 4;
+        y /= 4;
+        /* minimum is 4 x 4 pixel block */
+        for (uint32_t j = 0; j < MbPartHeight(mb_type) / 4; j++) {
+            for (uint32_t i = 0; i < MbPartWidth(mb_type) / 4; i++) {
+                mbPartIdxTable[x + i][y + j] = mbPartIdx;
+            }
+        }
+    }
+
+    int64_t addrs[4] = {mbAddrA, mbAddrB, mbAddrC, mbAddrD};
+    int64_t * addr_index[4] =
+            {&mbPartIdxA, &mbPartIdxB, &mbPartIdxC, &mbPartIdxD};
+    for (int i = 0; i < 4; i++) {
+        int64_t mb_addr = addrs[i];
+        if (mb_addr == -1) continue;
+        auto mb = ctx.mb_array[mb_addr];
+        uint64_t x = (mb->_pos_x + 16) % 16;
+        uint64_t y = (mb->_pos_y + 16) % 16;
+        x /= 4;
+        y /= 4;
+        *addr_index[i] = mb->mbPartIdxTable[x][y];
+    }
+
+    if ((mb_type == Intra_16x16 || Intra_4x4) && mbAddrC == -1) {
+        mbPartIdxC = mbPartIdxD;
+    }
 }
 
 void MacroBlock::assign_pos(ParserContext & ctx) {

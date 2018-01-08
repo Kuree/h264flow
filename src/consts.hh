@@ -120,6 +120,38 @@ along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
 #define RUNBEFORE_NUM_M1  6
 
 
+
+enum class SliceType {
+    TYPE_P = 0,
+    TYPE_B = 1,
+    TYPE_I = 2,
+    TYPE_EP = 0,
+    TYPE_EB = 1,
+    TYPE_EI = 2,
+    TYPE_SP = 3,
+    TYPE_SI = 4,
+};
+
+inline bool operator==(uint64_t lhs, SliceType rhs) {
+    uint64_t value = lhs % 5;
+    return value == (uint64_t)rhs;
+}
+
+inline bool operator==(SliceType lhs, uint64_t rhs) {
+    uint64_t value = rhs % 5;
+    return value == (uint64_t)lhs;
+}
+
+inline bool operator!=(uint64_t lhs, SliceType rhs) {
+    uint64_t value = lhs % 5;
+    return value != (uint64_t)rhs;
+}
+
+inline bool operator!=(SliceType lhs, uint64_t rhs) {
+    uint64_t value = rhs % 5;
+    return value != (uint64_t)lhs;
+}
+
 //Inter prediction slices - Macroblock types
 //Defined strictly by norm, page 121.
 //(Table 7-13 – Macroblock type values 0 to 4 for P and SP slices)
@@ -132,7 +164,7 @@ Fifth column:	MbPartPredMode( mb_type, 1 )
 Sixth column:	MbPartWidth( mb_type )
 Seventh column:	MbPartHeight( mb_type )
 */
-uint32_t P_and_SP_macroblock_modes[32][7]= {
+static const uint32_t P_and_SP_macroblock_modes[32][7]= {
         {0,  P_L0_16x16,    1,      Pred_L0,      NA,    16,  16},
         {1,  P_L0_L0_16x8,  2,      Pred_L0, Pred_L0,    16,  8},
         {2,  P_L0_L0_8x16,  2,      Pred_L0, Pred_L0,     8,  16},
@@ -193,7 +225,7 @@ Sixth column:	CodedBlockPatternChroma
 Seventh column:	CodedBlockPatternLuma
 */
 
-uint32_t I_Macroblock_Modes[27][7]=
+static const uint32_t I_Macroblock_Modes[27][7]=
 {
   {0,	I_4x4,			0,	Intra_4x4,   NA, NA, NA},
   //If this line was to be commented out, the MbPartPredMode macro would have to be changed
@@ -237,14 +269,14 @@ Fourth column:	SubMbPredMode( sub_mb_type[ mbPartIdx ] )
 Fifth column:	SubMbPartWidth( sub_mb_type[ mbPartIdx ] )
 Sixth column:	SubMbPartHeight( sub_mb_type[ mbPartIdx ] )
 */
-uint32_t P_sub_macroblock_modes[4][6] = {
+static const uint32_t P_sub_macroblock_modes[4][6] = {
 	{0,		P_L0_8x8,			1,	Pred_L0, 8,		8},
 	{1,		P_L0_8x4,			2,	Pred_L0, 8,		4},
 	{2,		P_L0_4x8,			2,	Pred_L0, 4,		8},
 	{3,		P_L0_4x4,			4,	Pred_L0, 4,		4}
 };
 
-uint32_t B_sub_macroblock_modes[13][6] = {
+static const uint32_t B_sub_macroblock_modes[13][6] = {
 		{0, B_Direct_8x8, NA,   Direct, 4,  4},
 		{1,     B_L0_8x8,  1,  Pred_L0, 8,  8},
 		{2,     B_L1_8x8,  1,  Pred_L1, 8,  8},
@@ -262,59 +294,22 @@ uint32_t B_sub_macroblock_modes[13][6] = {
 
 
 
-int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
 
-    return (slice_type % 5 == 0) ?
-           P_and_SP_macroblock_modes[mb_type][3 + (x % 2)] :
-           I_Macroblock_Modes[mb_type][3];
-}
 
-uint64_t NumMbPart(uint64_t mb_type) {
-    return P_and_SP_macroblock_modes[mb_type][2];
-}
-
-uint64_t MbPartWidth(uint64_t mb_type) {
-    return P_and_SP_macroblock_modes[mb_type][5];
-}
-
-uint64_t MbPartHeight(uint64_t mb_type) {
-    return P_and_SP_macroblock_modes[mb_type][6];
-}
-
-uint8_t codeNum_to_coded_block_pattern_intra[48]= {
+static const uint8_t codeNum_to_coded_block_pattern_intra[48]= {
     47, 31, 15, 0, 23, 27, 29, 30, 7, 11, 13, 14, 39, 43, 45, 46,
     16, 3, 5, 10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1, 2, 4,
     8, 17, 18, 20, 24, 6, 9, 22, 25, 32, 33, 34, 36, 40, 38, 41
 };
 
-uint8_t codeNum_to_coded_block_pattern_inter[48]= {
+static const uint8_t codeNum_to_coded_block_pattern_inter[48]= {
     0, 16, 1, 2, 4, 8, 32, 3, 5, 10, 12, 15, 47, 7, 11, 13,
     14, 6, 9,31, 35, 37, 42, 44, 33, 34, 36, 40, 39, 43, 45, 46,
     17, 18, 20, 24, 19, 21, 26, 28, 23, 27, 29, 30, 22, 25, 38, 41
 };
 
-uint64_t NumSubMbPart(uint64_t sub_mb_type, uint64_t slice_type) {
-    /* TODO: might not be true */
-    if (slice_type == SliceType::TYPE_P) {
-        return P_sub_macroblock_modes[sub_mb_type][2];
-    } else if (slice_type == SliceType::TYPE_B) {
-        return B_sub_macroblock_modes[sub_mb_type][2];
-    } else {
-        throw std::runtime_error("unsupported slice_type for sub_mb_type");
-    }
-}
 
-uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type) {
-    if (slice_type == SliceType::TYPE_P) {
-        return P_sub_macroblock_modes[sub_mb_type][3];
-    } else if (slice_type == SliceType::TYPE_B) {
-        return B_sub_macroblock_modes[sub_mb_type][3];
-    } else {
-        throw std::runtime_error("unsupported slice_type for sub_mb_type");
-    }
-}
-
-const uint8_t coeff_token_length[5][4][17] = {
+static const uint8_t coeff_token_length[5][4][17] = {
     //  0 <= nC < 2
     {{  1,  6,  8,  9, 10, 11, 13, 13, 13, 14, 14, 15, 15, 16, 16, 16, 16 },
      {  0,  2,  6,  8,  9, 10, 11, 13, 13, 14, 14, 15, 15, 15, 16, 16, 16 },
@@ -370,8 +365,7 @@ const uint8_t coeff_token_code[5][4][17] = {
      {  0,  0,  0,  1,  1,  9,  8,  4,  4,  0,  0,  0,  0,  0,  0,  0,  0 }}
 };
 
-
-const uint8_t totalzeros_lentab[TOTRUN_NUM][16] = {
+static const uint8_t totalzeros_lentab[TOTRUN_NUM][16] = {
         {1, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 9},
         {3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6},
         {4, 3, 3, 3, 4, 4, 3, 3, 4, 5, 5, 6, 5, 6},
@@ -389,7 +383,7 @@ const uint8_t totalzeros_lentab[TOTRUN_NUM][16] = {
         {1, 1},
 };
 
-const uint8_t totalzeros_codtab[TOTRUN_NUM][16] = {
+static const uint8_t totalzeros_codtab[TOTRUN_NUM][16] = {
         {1, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 1},
         {7, 6, 5, 4, 3, 5, 4, 3, 2, 3, 2, 3, 2, 1, 0},
         {5, 7, 6, 5, 4, 3, 4, 3, 2, 3, 2, 1, 1, 0},
@@ -407,7 +401,7 @@ const uint8_t totalzeros_codtab[TOTRUN_NUM][16] = {
         {0, 1},
 };
 
-const uint8_t totalzeros_chromadc_lentab[2][7][8] = {
+static const uint8_t totalzeros_chromadc_lentab[2][7][8] = {
         { // YUV 420
                 {1, 2, 3, 3},
                 {1, 2, 2},
@@ -424,7 +418,7 @@ const uint8_t totalzeros_chromadc_lentab[2][7][8] = {
         }
 };
 
-const uint8_t totalzeros_chromadc_codtab[2][7][8] = {
+static const uint8_t totalzeros_chromadc_codtab[2][7][8] = {
         { // YUV 420
                 {1, 1, 1, 0},
                 {1, 1, 0},
@@ -441,7 +435,7 @@ const uint8_t totalzeros_chromadc_codtab[2][7][8] = {
         }
 };
 
-const uint8_t runbefore_lentab[TOTRUN_NUM][16] = {
+static const uint8_t runbefore_lentab[TOTRUN_NUM][16] = {
         {1, 1},
         {1, 2, 2},
         {2, 2, 2, 2},
@@ -451,7 +445,7 @@ const uint8_t runbefore_lentab[TOTRUN_NUM][16] = {
         {3, 3, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11},
 };
 
-const uint8_t runbefore_codtab[TOTRUN_NUM][16] = {
+static const uint8_t runbefore_codtab[TOTRUN_NUM][16] = {
         {1, 0},
         {1, 1, 0},
         {3, 2, 1, 0},

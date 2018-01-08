@@ -14,11 +14,11 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "h264.hh"
-#include "consts.hh"
-#include "util.hh"
 #include <sstream>
 #include <experimental/filesystem>
+#include "h264.hh"
+#include "util.hh"
+#include "consts.hh"
 
 using std::shared_ptr;
 using std::runtime_error;
@@ -176,32 +176,197 @@ void h264::load_frame(uint64_t frame_num) {
     slice.parse(ctx);
 }
 
+/* adapted from py264 */
 void h264::process_inter_mb(ParserContext &ctx) {
+    /* only to work with 4:2:0 */
+    if (ctx.sps->chroma_array_type() != 1)
+        throw NotImplemented("chroma_array_type != 1");
     /* Section 8.4 */
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     uint64_t mb_type = mb->mb_type;
+    uint64_t slice_type = ctx.header()->slice_type;
     uint64_t numMbPart = NumMbPart(mb_type);
     /* baseline profile won't have B slice */
     if (mb->slice_type == SliceType::TYPE_B)
         throw NotImplemented("B Slice");
     for (uint32_t mbPartIdx = 0; mbPartIdx < numMbPart; mbPartIdx++) {
-        uint64_t partWidth = 0;
-        uint64_t partHeight = 0;
         uint64_t numSubMbParts = 0;
         if (mb_type != P_8x8 && mb_type != P_8x8ref0) {
             numSubMbParts = 1;
-            partWidth = MbPartWidth(mb_type);
-            partHeight = MbPartHeight(mb_type);
         } else if (mb_type == P_8x8 || mb_type == P_8x8ref0) {
             throw NotImplemented("numSubMbParts");
         } else {
-            partWidth = 4;
-            partHeight = 4;
-            numSubMbParts = 4;
+            throw NotImplemented("numSubMbParts = 4");
         }
-        uint64_t partWidthC = partWidth / ctx.SubWidthC();
-        uint64_t partHeightC = partHeight / ctx.SubHeightC();
+        //uint64_t partWidthC = partWidth / ctx.SubWidthC();
+        //uint64_t partHeightC = partHeight / ctx.SubHeightC();
 
-        uint64_t MvCnt = 0;
+        //uint64_t MvCnt = 0;
+
+        int refIdxL0 = -1;
+        int refIdxL1 = -1;
+
+        for (uint32_t subMbPartIdx = 0; subMbPartIdx < numSubMbParts;
+             subMbPartIdx++) {
+            bool predFlagL0 = false;
+            bool predFlagL1 = false;
+            int mvL0[2] = {0, 0};
+            int mvL1[2] = {0, 0};
+            /* section 8.4.1.1 */
+            if (mb_type == P_Skip) {
+                int refIdxLA = -1;
+                int refIdxLB = -1;
+                int refIdxLC = -1;
+                int mvL0A[2];
+                int mvL0B[2];
+                int mvL0C[2];
+                get_mv_neighbor_part(ctx, 0, mvL0A, mvL0B, mvL0C, refIdxLA,
+                                     refIdxLB, refIdxLC);
+                if (mb->mbAddrA == -1 || mb->mbAddrB == -1
+                    || (refIdxLA == 0 && mvL0A[0] == 0 && mvL0A[1] == 0)
+                    || (refIdxLB == 0 && mvL0B[0] == 0 && mvL0B[1] == 0)) {
+                    mvL0[0] = 0; mvL0[1] = 0;
+                } else {
+                    process_luma_mv(ctx, mvL0A, mvL0B, mvL0C, refIdxLA,
+                                    refIdxLB, refIdxLC, mvL0);
+                }
+
+                predFlagL0 = true;
+                predFlagL1 = false;
+            } else {
+                /* no B slice */
+                /* num mb part == 1 */
+                auto mb_pred_mode = MbPartPredMode(mb_type, mbPartIdx, slice_type);
+                if(mb_pred_mode == Pred_L0 || mb_pred_mode == BiPred) {
+                    refIdxL0 = (int)mb->mb_preds[0]->ref_idx_l0[mbPartIdx];
+                    predFlagL0 = true;
+                }
+                else {
+                    refIdxL0 = -1;
+                    predFlagL0 = false;
+                }
+
+                if(mb_pred_mode == Pred_L1 || mb_pred_mode == BiPred) {
+                    refIdxL1 = (int)mb->mb_preds[0]->ref_idx_l1[mbPartIdx];
+                    predFlagL1 = true;
+                }
+                else {
+                    refIdxL1 = -1;
+                    predFlagL1 = false;
+                }
+
+                if (predFlagL0) {
+                    int mvpL0[2] = {0, 0};
+                    process_luma_mv(ctx, 0, mvpL0);
+                    mvL0[0] = (int)(mvpL0[0] +
+                            mb->mb_preds[0]->mvd_l0[mbPartIdx][subMbPartIdx][0]);
+                    mvL0[1] = (int)(mvpL0[1] +
+                            mb->mb_preds[0]->mvd_l0[mbPartIdx][subMbPartIdx][1]);
+                }
+
+                if (predFlagL1) {
+                    int mvpL1[2] = {0, 0};
+                    process_luma_mv(ctx, 1, mvpL1);
+                    mvL1[0] = (int)(mvpL1[0] +
+                                    mb->mb_preds[0]->mvd_l1[mbPartIdx][subMbPartIdx][0]);
+                    mvL1[1] = (int)(mvpL1[1] +
+                                    mb->mb_preds[0]->mvd_l1[mbPartIdx][subMbPartIdx][1]);
+                }
+            }
+
+            mb->mvL[0][mbPartIdx][subMbPartIdx][0] = mvL0[0];
+            mb->mvL[0][mbPartIdx][subMbPartIdx][1] = mvL0[1];
+            mb->mvL[1][mbPartIdx][subMbPartIdx][0] = mvL1[1];
+            mb->mvL[1][mbPartIdx][subMbPartIdx][1] = mvL1[1];
+            mb->refIdxL[0][mbPartIdx] = refIdxL0;
+            mb->refIdxL[1][mbPartIdx] = refIdxL1;
+            mb->predFlagL[0][mbPartIdx] = predFlagL0;
+            mb->predFlagL[1][mbPartIdx] = predFlagL1;
+        }
+    }
+}
+
+void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mvLA)[2],
+                                int (&mvLB)[2], int (&mvLC)[2], int &refIdxLA,
+                                int &refIdxLB, int &refIdxLC) {
+    int64_t mbAddrA = ctx.mb->mbAddrA;
+    int64_t mbAddrB = ctx.mb->mbAddrB;
+    int64_t mbAddrC = ctx.mb->mbAddrC;
+
+    auto mbPartIdxA = ctx.mb->mbPartIdxA;
+    auto mbPartIdxB = ctx.mb->mbPartIdxB;
+    auto mbPartIdxC = ctx.mb->mbPartIdxC;
+
+    if (mbAddrA == -1 || is_mb_intra(ctx.mb_array[mbAddrA]->mb_type) ||
+            ctx.mb_array[mbAddrA]->predFlagL[listSuffixFlag][mbPartIdxA] == 0) {
+        mvLA[0] = 0; mvLA[1] = 0;
+        refIdxLA = -1;
+    } else {
+        int *m = ctx.mb_array[mbAddrA]->mvL[listSuffixFlag][mbPartIdxA][0];
+        mvLA[0] = m[0]; mvLA[1] = m[1];
+        refIdxLA = ctx.mb_array[mbAddrA]->refIdxL[listSuffixFlag][mbPartIdxA];
+    }
+
+    if (mbAddrB == -1 || is_mb_intra(ctx.mb_array[mbAddrB]->mb_type) ||
+        ctx.mb_array[mbAddrB]->predFlagL[listSuffixFlag][mbPartIdxB] == 0) {
+        mvLB[0] = 0; mvLB[1] = 0;
+        refIdxLB = -1;
+    } else {
+        int *m = ctx.mb_array[mbAddrB]->mvL[listSuffixFlag][mbPartIdxB][0];
+        mvLB[0] = m[0]; mvLB[1] = m[1];
+        refIdxLB = ctx.mb_array[mbAddrB]->refIdxL[listSuffixFlag][mbPartIdxB];
+    }
+
+    if (mbAddrC == -1 || is_mb_intra(ctx.mb_array[mbAddrC]->mb_type) ||
+        ctx.mb_array[mbAddrC]->predFlagL[listSuffixFlag][mbPartIdxC] == 0) {
+        mvLC[0] = 0; mvLC[1] = 0;
+        refIdxLC = -1;
+    } else {
+        int *m = ctx.mb_array[mbAddrC]->mvL[listSuffixFlag][mbPartIdxC][0];
+        mvLC[0] = m[0]; mvLC[1] = m[1];
+        refIdxLC = ctx.mb_array[mbAddrC]->refIdxL[listSuffixFlag][mbPartIdxC];
+    }
+}
+
+void h264::process_luma_mv(ParserContext &ctx, int listSuffixFlag,
+                           int (&mvL)[2]) {
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    int refIdxLA = -1;
+    int refIdxLB = -1;
+    int refIdxLC = -1;
+    int mvL0A[2];
+    int mvL0B[2];
+    int mvL0C[2];
+    get_mv_neighbor_part(ctx, listSuffixFlag, mvL0A, mvL0B, mvL0C,
+                         refIdxLA, refIdxLB, refIdxLC);
+    process_luma_mv(ctx, mvL0A, mvL0B, mvL0C, refIdxLA,
+                    refIdxLB, refIdxLC, mvL);
+
+}
+
+void h264::process_luma_mv(ParserContext &ctx, int (mvLA)[2],
+                           int (mvLB)[2], int (mvLC)[2], int refIdxLA,
+                           int refIdxLB, int refIdxLC, int (&mvL)[2]) {
+    std::shared_ptr<MacroBlock> mb = ctx.mb;
+    uint64_t mbPartWidth = MbPartWidth(mb->mb_type);
+    uint64_t mbPartHeight = MbPartHeight(mb->mb_type);
+    if (mbPartHeight != 16)
+        throw NotImplemented("mbPartHeight != 16");
+    if (mbPartWidth != 16)
+        throw NotImplemented("mbPartWidth");
+    /* 8.4.1.3.1*/
+    if(refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
+        mvL[0] = mvLA[0]; mvL[1] = mvLA[1];
+    } else if (refIdxLA == -1 and refIdxLB != -1 and refIdxLC == -1) {
+        mvL[0] = mvLB[0]; mvL[1] = mvLB[1];
+    } else if (refIdxLA == -1 and refIdxLB == -1 and refIdxLC != -1) {
+        mvL[0] = mvLC[0]; mvL[1] = mvLC[1];
+    } else if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
+        mvL[0] = 0; mvL[1] = 0;
+    } else {
+        int L0[3] = {mvLA[0], mvLB[0], mvLC[0]};
+        int L1[3] = {mvLA[1], mvLB[1], mvLC[1]};
+        mvL[0] = median<int>(L0, 3);
+        mvL[1] = median<int>(L1, 3);
     }
 }

@@ -17,47 +17,18 @@
 #ifndef H264FLOW_NAL_HH
 #define H264FLOW_NAL_HH
 
-#include "io.hh"
+
 #include <string>
 #include <memory>
 #include <vector>
 #include <cmath>
 #include <utility>
+#include "io.hh"
+#include "consts.hh"
 
 class MacroBlock;
 class ParserContext;
 class Slice_NALUnit;
-
-enum class SliceType {
-    TYPE_P = 0,
-    TYPE_B = 1,
-    TYPE_I = 2,
-    TYPE_EP = 0,
-    TYPE_EB = 1,
-    TYPE_EI = 2,
-    TYPE_SP = 3,
-    TYPE_SI = 4,
-};
-
-inline bool operator==(uint64_t lhs, SliceType rhs) {
-    uint64_t value = lhs % 5;
-    return value == (uint64_t)rhs;
-}
-
-inline bool operator==(SliceType lhs, uint64_t rhs) {
-    uint64_t value = rhs % 5;
-    return value == (uint64_t)lhs;
-}
-
-inline bool operator!=(uint64_t lhs, SliceType rhs) {
-    uint64_t value = lhs % 5;
-    return value != (uint64_t)rhs;
-}
-
-inline bool operator!=(SliceType lhs, uint64_t rhs) {
-    uint64_t value = rhs % 5;
-    return value != (uint64_t)lhs;
-}
 
 /* taken from https://github.com/emericg/MiniVideo/ */
 enum class BlockType {
@@ -446,14 +417,6 @@ private:
                              int &luma4x4BlkIdxA, int &mbAddrB,
                              int &luma4x4BlkIdxB);
     inline void InverseLuma4x4BlkScan(const int luma4x4BlkIdx, int &x, int &y);
-    inline int InverseRasterScan_x(const int a, const int b, const int,
-                                    const int d) {
-        return (a % (d / b)) * b;
-    }
-    inline int InverseRasterScan_y(const int a, const int b, const int c,
-                                   const int d) {
-        return (a / (d / b)) * c;
-    }
     void deriv_neighbouringlocations(ParserContext &ctx, const bool lumaBlock,
                                      const int xN, const int yN, int &mbAddrN,
                                      int &xW, int &yW);
@@ -500,8 +463,10 @@ public:
 class MacroBlock {
 public:
     MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr);
+    MacroBlock(ParserContext & ctx, bool mb_field_decoding_flag,
+               uint64_t curr_mb_addr);
     void parse(ParserContext &ctx, BinaryReader &br);
-    uint64_t mb_type = 0;
+    uint64_t mb_type = P_Skip; /* default to skip */
     bool transform_size_8x8_flag = false;
 
     std::vector<std::shared_ptr<MbPred>> mb_preds;
@@ -514,6 +479,11 @@ public:
     int64_t mbAddrB = -1;
     int64_t mbAddrC = -1;
     int64_t mbAddrD = -1;
+
+    int64_t mbPartIdxA = -1;
+    int64_t mbPartIdxB = -1;
+    int64_t mbPartIdxC = -1;
+    int64_t mbPartIdxD = -1;
 
     int TotalCoeffs_luma[16];
     int TotalCoeffs_chroma[2][4];
@@ -531,8 +501,15 @@ public:
 
     uint64_t slice_type = 0; /* will be assigned in parsing */
 
+    int mvL[2][4][4][2];
+    bool predFlagL[2][4];
+    int refIdxL[2][4];
+
+    uint64_t mbPartIdxTable [4][4];
+
 private:
-    void compute_mb_neighbours(std::shared_ptr<SPS_NALUnit> sps);
+    void compute_mb_neighbours(ParserContext &ctx);
+    void compute_mb_index(ParserContext &ctx);
     void assign_pos(ParserContext & ctx);
 
     uint64_t _pos_x = 0;

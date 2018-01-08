@@ -53,6 +53,14 @@ private:
     uint64_t read_nal_size(BinaryReader &br);
 
     void process_inter_mb(ParserContext &ctx);
+    void get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mvLA)[2],
+                              int (&mvLB)[2], int (&mvLC)[2], int &refIdxLA,
+                              int &refIdxLB, int &refIdxLC);
+    void process_luma_mv(ParserContext &ctx, int (mvLA)[2],
+                         int (mvLB)[2], int (mvLC)[2], int refIdxLA,
+                         int refIdxLB, int refIdxLC, int (&mvL)[2]);
+
+    void process_luma_mv(ParserContext &ctx, int listSuffixFlag, int (&mvL)[2]);
 };
 
 
