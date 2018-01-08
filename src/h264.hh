@@ -34,13 +34,35 @@ private:
     std::vector<std::pair<uint64_t, uint64_t>> _chunk_offsets;
 };
 
+struct MotionVector {
+    int mvL0[2] = {0, 0};
+    int mvL1[2] = {0, 0};
+};
+
+class MvFrame {
+public:
+    explicit MvFrame(ParserContext &ctx);
+    MotionVector get_mv(uint32_t mb_addr);
+    MotionVector get_mv(uint32_t x, uint32_t y);
+    std::vector<std::vector<MotionVector>> get_all_mvs()
+    { return  _mvs; }
+
+private:
+    uint32_t _height = 0;
+    uint32_t _width = 0;
+    uint32_t _mb_width = 0;
+    uint32_t _mb_height = 0;
+    std::vector<std::vector<MotionVector>> _mvs;
+};
+
 class h264 {
 public:
-    h264(std::shared_ptr<MP4File> mp4);
-    h264(std::shared_ptr<BitStream> stream);
+    explicit h264(std::shared_ptr<MP4File> mp4);
+    explicit h264(std::shared_ptr<BitStream> stream);
 
     void index_nal();
-    void load_frame(uint64_t frame_num);
+    std::shared_ptr<MvFrame> load_frame(uint64_t frame_num);
+
 private:
     uint8_t _length_size = 4;
     std::vector<uint64_t> _chunk_offsets;
@@ -61,6 +83,8 @@ private:
                          int refIdxLB, int refIdxLC, int (&mvL)[2]);
 
     void process_luma_mv(ParserContext &ctx, int listSuffixFlag, int (&mvL)[2]);
+
+    std::shared_ptr<MvFrame> produce_mv(ParserContext & ctx);
 };
 
 

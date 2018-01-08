@@ -1397,3 +1397,15 @@ void ParserContext::set_header(std::shared_ptr<SliceHeader> header) {
     _header = std::move(header);
     mb_array = std::vector<std::shared_ptr<MacroBlock>>(PicSizeInMbs());
 }
+
+uint32_t ParserContext::Height() {
+    return (uint32_t)((FrameHeightInMbs() * 16)
+                      - (sps->frame_crop_top_offset() * 2)
+                      - (sps->frame_crop_bottom_offset() * 2));
+}
+
+uint32_t ParserContext::Width() {
+    return (uint32_t)((PicWidthInMbs() * 16)
+                      - sps->frame_crop_right_offset() * 2
+                      - sps->frame_crop_left_offset()*2);
+}

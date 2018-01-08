@@ -151,7 +151,7 @@ uint64_t h264::read_nal_size(BinaryReader &br) {
     return unit_size;
 }
 
-void h264::load_frame(uint64_t frame_num) {
+std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
     /* TODO: this is not actually frame_num, need to strip down slice_header
      * TODO: to obtain the actual frame_num (see TODO in index_nal()
      */
@@ -174,6 +174,9 @@ void h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(_sps, _pps);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
+
+    process_inter_mb(ctx);
+    return produce_mv(ctx);
 }
 
 /* adapted from py264 */
@@ -369,4 +372,45 @@ void h264::process_luma_mv(ParserContext &ctx, int (mvLA)[2],
         mvL[0] = median<int>(L0, 3);
         mvL[1] = median<int>(L1, 3);
     }
+}
+
+std::shared_ptr<MvFrame> h264::produce_mv(ParserContext &ctx) {
+    return std::make_shared<MvFrame>(ctx);
+}
+
+MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
+    _height = ctx.Height();
+    _width = ctx.Width();
+    _mvs = std::vector<std::vector<MotionVector>>(_height,
+                                                  std::vector<MotionVector>(_width));
+    _mb_width = (uint32_t)ctx.PicWidthInMbs();
+    _mb_height = (uint32_t)ctx.PicHeightInMapUnits();
+    for (uint32_t i = 0; i < _mb_height; i++) {
+        for (uint32_t j = 0; j < _mb_width; j++) {
+            /* compute mb_addr */
+            uint32_t mb_addr = i * _mb_width + j;
+            std::shared_ptr<MacroBlock> mb = ctx.mb_array[mb_addr];
+            if (mb->pos_x() != j || mb->pos_y() != i)
+                throw std::runtime_error("pos does not match");
+            MotionVector mv {
+                    mb->mvL[0][0][0][0],
+                    mb->mvL[0][0][0][1],
+                    mb->mvL[1][0][0][0],
+                    mb->mvL[1][0][0][1]
+            };
+            _mvs[i][j] = mv;
+        }
+    }
+}
+
+MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) {
+    uint32_t j = x / 16;
+    uint32_t i = y / 16;
+    return _mvs[i][j];
+}
+
+MotionVector MvFrame::get_mv(uint32_t mb_addr) {
+    uint32_t j = mb_addr % _mb_width;
+    uint32_t i = mb_addr / _mb_width;
+    return _mvs[i][j];
 }

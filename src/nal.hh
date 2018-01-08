@@ -507,6 +507,9 @@ public:
 
     uint64_t mbPartIdxTable [4][4];
 
+    uint32_t pos_x() { return (uint32_t)_pos_x; }
+    uint32_t pos_y() { return (uint32_t)_pos_y; }
+
 private:
     void compute_mb_neighbours(ParserContext &ctx);
     void compute_mb_index(ParserContext &ctx);
@@ -556,6 +559,9 @@ public:
     uint32_t SubWidthC();
     uint32_t MbWidthC() { return 16 / SubWidthC(); }
     uint32_t MbHeightC() { return 16 / SubHeightC(); }
+
+    uint32_t Height();
+    uint32_t Width();
 
     std::shared_ptr<SliceHeader> header() { return _header; }
     void set_header(std::shared_ptr<SliceHeader> header);
