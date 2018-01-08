@@ -47,6 +47,11 @@ public:
     std::vector<std::vector<MotionVector>> get_all_mvs()
     { return  _mvs; }
 
+    uint32_t height() { return _height; }
+    uint32_t width() { return _width; }
+    uint32_t mb_height() { return _mb_height; }
+    uint32_t mb_width() { return _mb_width; }
+
 private:
     uint32_t _height = 0;
     uint32_t _width = 0;

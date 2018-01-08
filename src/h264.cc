@@ -405,9 +405,7 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
 }
 
 MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) {
-    uint32_t j = x / 16;
-    uint32_t i = y / 16;
-    return _mvs[i][j];
+    return _mvs[y][x];
 }
 
 MotionVector MvFrame::get_mv(uint32_t mb_addr) {

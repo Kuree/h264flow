@@ -3,6 +3,7 @@
 //
 
 #include "../src/h264.hh"
+#include "../src/util.hh"
 
 using namespace std;
 
@@ -16,7 +17,24 @@ int main(int argc, char * argv[]) {
     cerr << "WARN: MPEG-4/AVC is untested" << endl;
     auto bs = make_shared<BitStream>(filename);
     h264 decoder(bs);
-    std::shared_ptr<MvFrame> frame = decoder.load_frame(frame_num);
-    auto mv = frame->get_mv(6);
-    cout << mv.mvL0[0] << " " << mv.mvL0[1] << endl;
+    try {
+        std::shared_ptr<MvFrame> frame = decoder.load_frame(frame_num);
+        cout << "Frame size: " << frame->width() << "x" << frame->height()
+             << endl;
+        uint32_t counter = 0;
+        for (uint32_t y = 0; y < frame->mb_height(); y++) {
+            for (uint32_t x = 0; x < frame->mb_width(); x++) {
+                auto mv = frame->get_mv(x, y);
+                cout << "x: " << x << " y: " << y << " mvL0: ("
+                     <<  mv.mvL0[0] << ", " << mv.mvL0[1] << ")";
+                if (counter++ % 3 == 2)
+                    cout << endl;
+                else
+                    cout << "    ";
+            }
+        }
+    } catch (const NotImplemented & ex) {
+        cerr << "ERROR " << ex.what()
+             << endl << "Please make sure it's a P-slice" << endl;
+    }
 }
