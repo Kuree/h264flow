@@ -51,7 +51,7 @@ public:
     /* for NAL */
     uint64_t read_ue();
     int64_t read_se();
-    uint64_t read_te();
+    uint64_t read_te(uint64_t range);
     uint8_t read_bit();
     uint64_t read_bits(uint64_t bits);
     uint64_t next_bits(uint64_t bits);

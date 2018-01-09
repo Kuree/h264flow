@@ -818,14 +818,14 @@ void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
                   mb->mb_field_decoding_flag != header->field_pic_flag ) &&
                 MbPartPredMode(mb->mb_type, mbPartIdx,
                                header->slice_type) != Pred_L1)
-            ref_idx_l0[mbPartIdx] = br.read_te();
+            ref_idx_l0[mbPartIdx] = br.read_te(0);
         }
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if ((header->num_ref_idx_l0_active_minus1 > 0 ||
                   mb->mb_field_decoding_flag != header->field_pic_flag ) &&
                 MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0)
-                ref_idx_l1[mbPartIdx] = br.read_te();
+                ref_idx_l1[mbPartIdx] = br.read_te(0);
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L1 )
@@ -854,7 +854,7 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
             SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L1) {
-            ref_idx_l0[mbPartIdx] = br.read_te();
+            ref_idx_l0[mbPartIdx] = br.read_te(0);
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
@@ -864,7 +864,7 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
             SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L0) {
-            ref_idx_l1[mbPartIdx] = br.read_te();
+            ref_idx_l1[mbPartIdx] = br.read_te(0);
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
