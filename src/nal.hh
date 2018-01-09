@@ -306,7 +306,7 @@ public:
     { return std::make_pair<uint64_t, uint8_t>(
                 (uint64_t)_header_size[0], (uint8_t)_header_size[1]); }
 
-    void parse(ParserContext & ctx);
+    void parse(ParserContext & ctx, BinaryReader &br);
 private:
     uint64_t _header_size[2] = {0, 0};
     std::string _data;
@@ -347,7 +347,7 @@ public:
 class SliceData {
 public:
     explicit SliceData(const Slice_NALUnit & nal) : _nal(nal) {}
-    void parse(ParserContext & ctx);
+    void parse(ParserContext & ctx, BinaryReader & br);
 private:
     const Slice_NALUnit & _nal;
 
@@ -362,7 +362,7 @@ private:
                                           std::shared_ptr<PPS_NALUnit> pps);
 
     bool more_rbsp_data(BinaryReader & br);
-    void find_trailing_bit(std::string &data);
+    void find_trailing_bit();
     uint64_t _trailing_bit = 0;
 };
 
@@ -530,9 +530,6 @@ public:
     void parse(ParserContext & ctx);
 
     std::shared_ptr<SliceHeader> header() { return _header; }
-    std::pair<uint64_t, uint8_t> header_size() const
-    { return _header ? _header->header_size()
-                     : std::make_pair<uint64_t, uint8_t>(0, 0); }
 private:
     std::shared_ptr<SliceHeader> _header = nullptr;
     std::shared_ptr<SliceData> _slice_data = nullptr;

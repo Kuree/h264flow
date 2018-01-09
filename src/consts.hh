@@ -292,10 +292,6 @@ static const uint32_t B_sub_macroblock_modes[13][6] = {
 		{12,    B_Bi_4x4,  4,   BiPred, 4,  4},
 };
 
-
-
-
-
 static const uint8_t codeNum_to_coded_block_pattern_intra[48]= {
     47, 31, 15, 0, 23, 27, 29, 30, 7, 11, 13, 14, 39, 43, 45, 46,
     16, 3, 5, 10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1, 2, 4,

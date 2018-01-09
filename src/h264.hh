@@ -70,7 +70,7 @@ public:
 
     void index_nal();
     std::shared_ptr<MvFrame> load_frame(uint64_t frame_num);
-
+    uint32_t num_frames() { return _chunk_offsets.size(); }
 private:
     uint8_t _length_size = 4;
     std::vector<uint64_t> _chunk_offsets;
@@ -86,11 +86,13 @@ private:
     void get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mvLA)[2],
                               int (&mvLB)[2], int (&mvLC)[2], int &refIdxLA,
                               int &refIdxLB, int &refIdxLC);
-    void process_luma_mv(ParserContext &ctx, int (mvLA)[2],
-                         int (mvLB)[2], int (mvLC)[2], int refIdxLA,
-                         int refIdxLB, int refIdxLC, int (&mvL)[2]);
+    void process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx,
+                         int (mvLA)[2], int (mvLB)[2], int (mvLC)[2],
+                         int refIdxLA, int refIdxLB, int refIdxLC,
+                         int (&mvL)[2]);
 
-    void process_luma_mv(ParserContext &ctx, int listSuffixFlag, int (&mvL)[2]);
+    void process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx,
+                         int listSuffixFlag, int (&mvL)[2]);
 
     std::shared_ptr<MvFrame> produce_mv(ParserContext & ctx);
 };

@@ -209,18 +209,16 @@ Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
 }
 
 void Slice_NALUnit::parse(ParserContext & ctx) {
-    _header->parse(ctx);
-    ctx.set_header(_header);
-    /* TODO: fix this later */
-    _slice_data->parse(ctx);
-}
-
-void SliceHeader::parse(ParserContext &ctx) {
-
-    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
-    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::stringstream stream(_data);
     BinaryReader br(stream);
+    _header->parse(ctx, br);
+    ctx.set_header(_header);
+    _slice_data->parse(ctx, br);
+}
+
+void SliceHeader::parse(ParserContext &ctx, BinaryReader &br) {
+    std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
 
     first_mb_in_slice = br.read_ue();
     slice_type = br.read_ue();
@@ -303,8 +301,6 @@ void SliceHeader::parse(ParserContext &ctx) {
                                         slice_group_change_rate + 1);
         slice_group_change_cycle = br.read_bits(bits);
     }
-    _header_size[0] = br.pos();
-    _header_size[1] = br.bit_pos();
 }
 
 RefPicListModification::RefPicListModification()
@@ -438,8 +434,8 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
     }
 }
 
-void SliceData::find_trailing_bit(std::string &data) {
-    std::istringstream stream(data);
+void SliceData::find_trailing_bit() {
+    std::istringstream stream(_nal.data());
     BinaryReader br(stream);
     uint64_t pos = br.size() - 1;
     /* search from the back */
@@ -454,22 +450,15 @@ void SliceData::find_trailing_bit(std::string &data) {
         }
         pos--;
     }
-
 }
 
 bool SliceData::more_rbsp_data(BinaryReader &br) {
+    if (!_trailing_bit)
+        find_trailing_bit();
     return (br.pos() * 8 + br.bit_pos()) < _trailing_bit;
 }
 
-void SliceData::parse(ParserContext & ctx) {
-    std::string data = _nal.data();
-    find_trailing_bit(data);
-    std::istringstream stream(data);
-    BinaryReader br(stream);
-    auto header_size = _nal.header_size();
-    br.seek(header_size.first);
-    br.set_bit_pos(header_size.second);
-
+void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -1006,14 +995,20 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
     std::shared_ptr<MacroBlock> mb = ctx.mb;
 
     /* FIXME: this is a hack to make it the same with JM reference player */
-    if (mb->mb_preds.size() && mb->mb_preds[0]->intra_chroma_pred_mode)
-        mb->CodedBlockPatternChroma = 3;
+    bool intra_dc = false;
+    bool intra_ac = false;
+    if (MbPartWidth(mb->mb_type) == 2) {
+        intra_dc = true;
+        intra_ac = true;
+    } else if (MbPartWidth(mb->mb_type) == 1) {
+        intra_dc = true;
+    }
 
     uint64_t chroma_array_type = sps->chroma_array_type();
     if (chroma_array_type == 1 || chroma_array_type == 2) {
         int NumC8x8 = 4 / (ctx.SubWidthC() * ctx.SubHeightC());
         for (int iCbCr = 0; iCbCr < 2; iCbCr++) {
-            if ((mb->CodedBlockPatternChroma & 3) && (startIdx == 0)) {
+            if ((mb->CodedBlockPatternChroma & 3 || intra_dc) && (startIdx == 0)) {
                 if (ctx.pps->entropy_coding_mode_flag())
                     throw NotImplemented("entropy_coding_mode_flag");
                 else {
@@ -1035,7 +1030,7 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
             for (int i8x8 = 0; i8x8 < NumC8x8; i8x8++) {
                 for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                     int blkIdx = i8x8*4 + i4x4;
-                    if (mb->CodedBlockPatternChroma & 2) {
+                    if (mb->CodedBlockPatternChroma & 2 || intra_ac) {
                         if (ctx.pps->entropy_coding_mode_flag())
                             throw NotImplemented("entropy_coding_mode_flag");
                         else {
@@ -1095,12 +1090,12 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
         }
         if (mbAddrA_temp != -1) { // 5 6 - A
             if (((header->slice_type == 0 || header->slice_type == 5)
-                 && mb->mb_type == P_Skip)
+                 && ctx.mb_array[mbAddrA_temp]->mb_type == P_Skip)
                 || ((header->slice_type == 1 || header->slice_type == 6)
-                    && mb->mb_type == B_Skip)) {
+                    && ctx.mb_array[mbAddrA_temp]->mb_type == B_Skip)) {
                 nA = 0;
             } else if ((header->slice_type == 2 || header->slice_type == 7)
-                       && mb->mb_type == I_PCM) {
+                       && ctx.mb_array[mbAddrA_temp]->mb_type == I_PCM) {
                 nA = 16;
             } else {
                 if ((int)block_type < 4)
@@ -1116,9 +1111,9 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
         if (mbAddrB_temp != -1) // 5 6 - B
         {
             if (((header->slice_type == 0 || header->slice_type == 5)
-                 && ctx.mb_array[mbAddrA_temp]->mb_type == P_Skip) ||
+                 && ctx.mb_array[mbAddrB_temp]->mb_type == P_Skip) ||
                 ((header->slice_type == 1 || header->slice_type == 6)
-                 && ctx.mb_array[mbAddrA_temp]->mb_type == B_Skip)) {
+                 && ctx.mb_array[mbAddrB_temp]->mb_type == B_Skip)) {
                 nB = 0;
             }
             else if ((header->slice_type == 2 || header->slice_type == 7)

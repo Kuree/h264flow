@@ -25,7 +25,7 @@
 
 class BinaryReader {
 public:
-    explicit BinaryReader(std::istream & stream) : _stream(stream) {}
+    explicit BinaryReader(std::istream & stream);
 
     /* read values */
     uint8_t read_uint8() { return read_raw<uint8_t>(false); }
@@ -61,7 +61,7 @@ public:
     }
     bool read_bit_as_bool() { return static_cast<bool>(read_bit()); }
     uint8_t bit_pos() const { return _bit_pos; }
-    void set_bit_pos(uint8_t bit_pos) { _bit_pos = bit_pos; }
+    void set_bit_pos(uint8_t bit_pos);
 
     /* io functions */
     uint64_t pos() { return (uint64_t)_stream.tellg(); }
@@ -83,7 +83,6 @@ private:
     uint8_t _last_byte = 0;
 
     uint64_t _size = 0; // avoid seeking on disk
-    bool _has_bit_read = false;
 
     template<typename T> T read_raw(bool switch_endian) {
         size_t size = sizeof(T);

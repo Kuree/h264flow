@@ -84,6 +84,7 @@ h264::h264(std::shared_ptr<MP4File> mp4) : _chunk_offsets(), _mp4(mp4) {
 }
 
 void h264::index_nal() {
+    if (_bit_stream) return;
     auto box = _trak_box->find_first("stco");
     if (!box) box = _trak_box->find_first("co64");
     if (!box) throw std::runtime_error("stco/co64 not found");
@@ -232,8 +233,8 @@ void h264::process_inter_mb(ParserContext &ctx) {
                         mvL0[0] = 0;
                         mvL0[1] = 0;
                     } else {
-                        process_luma_mv(ctx, mvL0A, mvL0B, mvL0C, refIdxLA,
-                                        refIdxLB, refIdxLC, mvL0);
+                        process_luma_mv(ctx, mbPartIdx, mvL0A, mvL0B, mvL0C,
+                                        refIdxLA, refIdxLB, refIdxLC, mvL0);
                     }
 
                     predFlagL0 = true;
@@ -261,7 +262,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
 
                     if (predFlagL0) {
                         int mvpL0[2] = {0, 0};
-                        process_luma_mv(ctx, 0, mvpL0);
+                        process_luma_mv(ctx, mbPartIdx, 0, mvpL0);
                         mvL0[0] = (int) (mvpL0[0] +
                                          mb->mb_preds[0]->mvd_l0[mbPartIdx][subMbPartIdx][0]);
                         mvL0[1] = (int) (mvpL0[1] +
@@ -270,7 +271,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
 
                     if (predFlagL1) {
                         int mvpL1[2] = {0, 0};
-                        process_luma_mv(ctx, 1, mvpL1);
+                        process_luma_mv(ctx, mbPartIdx, 1, mvpL1);
                         mvL1[0] = (int) (mvpL1[0] +
                                          mb->mb_preds[0]->mvd_l1[mbPartIdx][subMbPartIdx][0]);
                         mvL1[1] = (int) (mvpL1[1] +
@@ -333,8 +334,8 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
     }
 }
 
-void h264::process_luma_mv(ParserContext &ctx, int listSuffixFlag,
-                           int (&mvL)[2]) {
+void h264::process_luma_mv(ParserContext &ctx, uint32_t mbPartIdx,
+                           int listSuffixFlag, int (&mvL)[2]) {
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     int refIdxLA = -1;
     int refIdxLB = -1;
@@ -344,35 +345,45 @@ void h264::process_luma_mv(ParserContext &ctx, int listSuffixFlag,
     int mvL0C[2];
     get_mv_neighbor_part(ctx, listSuffixFlag, mvL0A, mvL0B, mvL0C,
                          refIdxLA, refIdxLB, refIdxLC);
-    process_luma_mv(ctx, mvL0A, mvL0B, mvL0C, refIdxLA,
+    process_luma_mv(ctx, mbPartIdx, mvL0A, mvL0B, mvL0C, refIdxLA,
                     refIdxLB, refIdxLC, mvL);
 
 }
 
-void h264::process_luma_mv(ParserContext &ctx, int (mvLA)[2],
+void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2],
                            int (mvLB)[2], int (mvLC)[2], int refIdxLA,
                            int refIdxLB, int refIdxLC, int (&mvL)[2]) {
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     uint64_t mbPartWidth = MbPartWidth(mb->mb_type);
     uint64_t mbPartHeight = MbPartHeight(mb->mb_type);
-    if (mbPartHeight != 16)
-        throw NotImplemented("mbPartHeight != 16");
-    if (mbPartWidth != 16)
-        throw NotImplemented("mbPartWidth");
-    /* 8.4.1.3.1*/
-    if(refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
-        mvL[0] = mvLA[0]; mvL[1] = mvLA[1];
-    } else if (refIdxLA == -1 and refIdxLB != -1 and refIdxLC == -1) {
+    if (mbPartWidth == 16 && mbPartHeight == 8 && mbPartIdx == 0) {
         mvL[0] = mvLB[0]; mvL[1] = mvLB[1];
-    } else if (refIdxLA == -1 and refIdxLB == -1 and refIdxLC != -1) {
+    } else if (mbPartWidth == 16 && mbPartHeight == 8 && mbPartIdx == 1) {
+        mvL[0] = mvLA[0]; mvL[1] = mvLA[1];
+    } else if (mbPartWidth == 8 && mbPartHeight == 16 && mbPartIdx == 0) {
+        mvL[0] = mvLA[0]; mvL[1] = mvLA[1];
+    } else if (mbPartWidth == 8 && mbPartHeight == 16 && mbPartIdx == 1) {
         mvL[0] = mvLC[0]; mvL[1] = mvLC[1];
-    } else if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
-        mvL[0] = 0; mvL[1] = 0;
     } else {
-        int L0[3] = {mvLA[0], mvLB[0], mvLC[0]};
-        int L1[3] = {mvLA[1], mvLB[1], mvLC[1]};
-        mvL[0] = median<int>(L0, 3);
-        mvL[1] = median<int>(L1, 3);
+        /* 8.4.1.3.1*/
+        if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
+            mvL[0] = mvLA[0];
+            mvL[1] = mvLA[1];
+        } else if (refIdxLA == -1 and refIdxLB != -1 and refIdxLC == -1) {
+            mvL[0] = mvLB[0];
+            mvL[1] = mvLB[1];
+        } else if (refIdxLA == -1 and refIdxLB == -1 and refIdxLC != -1) {
+            mvL[0] = mvLC[0];
+            mvL[1] = mvLC[1];
+        } else if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
+            mvL[0] = 0;
+            mvL[1] = 0;
+        } else {
+            int L0[3] = {mvLA[0], mvLB[0], mvLC[0]};
+            int L1[3] = {mvLA[1], mvLB[1], mvLC[1]};
+            mvL[0] = median<int>(L0, 3);
+            mvL[1] = median<int>(L1, 3);
+        }
     }
 }
 
