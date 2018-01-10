@@ -81,4 +81,8 @@ uint64_t MbPartWidth(uint64_t mb_type);
 
 uint64_t MbPartHeight(uint64_t mb_type);
 
+int MbPredLuma(uint64_t mb_type);
+
+int MbPredChroma(uint64_t mb_type);
+
 #endif //H264FLOW_UTIL_HH

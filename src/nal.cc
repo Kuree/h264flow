@@ -18,7 +18,9 @@
 #include <algorithm>
 #include "nal.hh"
 #include "util.hh"
-#include "consts.hh"
+
+
+#include <string>
 
 using std::shared_ptr;
 using std::make_shared;
@@ -219,6 +221,10 @@ void Slice_NALUnit::parse(ParserContext & ctx) {
 void SliceHeader::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+
+    /* assign default value */
+    num_ref_idx_l0_active_minus1 = pps->num_ref_idx_l0_default_active_minus1();
+    num_ref_idx_l1_active_minus1 = pps->num_ref_idx_l1_default_active_minus1();
 
     first_mb_in_slice = br.read_ue();
     slice_type = br.read_ue();
@@ -500,22 +506,12 @@ void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
             ctx.mb = block;
             ctx.mb_array[curr_mb_addr] = block;
             ctx.mb->parse(ctx, br);
+            //has_added = true;
         }
         if (!pps->entropy_coding_mode_flag()) {
             more_data_flag = more_rbsp_data(br);
         } else {
             throw NotImplemented("entropy_coding_mode_flag");
-            //if (header->slice_type != SliceType::TYPE_I
-            //    && header->slice_type != SliceType::TYPE_SI) {
-            //    prev_mb_skipped = mb_skip_flag;
-            //    if (mbaff_frame_flag && mb_addr % 2 == 0) {
-            //        more_data_flag = true;
-            //    } else {
-            //        /* TODO: not sure if that ae(v) is correct here */
-            //        bool end_of_slice_flag = br.read_bit_as_bool();
-            //        more_data_flag = !end_of_slice_flag;
-            //    }
-            //}
         }
         curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
     } while (more_data_flag);
@@ -733,8 +729,8 @@ void MacroBlock::compute_mb_neighbours(ParserContext &ctx) {
 void MacroBlock::compute_mb_index(ParserContext &ctx) {
     /* compute MbPartIdx table */
     uint64_t numMbPart = NumMbPart(mb_type);
-    if (numMbPart == 4)
-        throw NotImplemented("numMbPart == 4");
+    //if (numMbPart == 4)
+    //    throw NotImplemented("numMbPart == 4");
     for (uint32_t mbPartIdx = 0; mbPartIdx < numMbPart; mbPartIdx++) {
         int x = 0; int y = 0;
         if (numMbPart == 2) {
@@ -813,19 +809,21 @@ void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
             intra_chroma_pred_mode = br.read_ue();
     } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) != Direct){
         uint64_t num_mb_part = NumMbPart(mb->mb_type);
+        uint64_t range_te0 = header->num_ref_idx_l0_active_minus1 + 1;
+        uint64_t range_te1 = header->num_ref_idx_l1_active_minus1 + 1;
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
-            if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+            if ((range_te0 > 1 ||
                   mb->mb_field_decoding_flag != header->field_pic_flag ) &&
                 MbPartPredMode(mb->mb_type, mbPartIdx,
                                header->slice_type) != Pred_L1)
-            ref_idx_l0[mbPartIdx] = br.read_te(0);
+            ref_idx_l0[mbPartIdx] = br.read_te(range_te0);
         }
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
-            if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+            if ((range_te1 > 1 ||
                   mb->mb_field_decoding_flag != header->field_pic_flag ) &&
                 MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0)
-                ref_idx_l1[mbPartIdx] = br.read_te(0);
+                ref_idx_l1[mbPartIdx] = br.read_te(range_te1);
 
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
             if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L1 )
@@ -845,26 +843,28 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
+    uint64_t te0 = header->num_ref_idx_l0_active_minus1 + 1;
+    uint64_t te1 = header->num_ref_idx_l1_active_minus1 + 1;
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++)
         sub_mb_type[mbPartIdx] = br.read_ue();
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
-        if ((header->num_ref_idx_l0_active_minus1 > 0 ||
+        if ((te0 > 1 ||
              mb->mb_field_decoding_flag != header->field_pic_flag) &&
             mb->mb_type != P_8x8ref0 &&
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
             SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L1) {
-            ref_idx_l0[mbPartIdx] = br.read_te(0);
+            ref_idx_l0[mbPartIdx] = br.read_te(te0);
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
-        if ((header->num_ref_idx_l1_active_minus1 > 0 ||
+        if ((te1 > 1 ||
              mb->mb_field_decoding_flag != header->field_pic_flag) &&
             mb->mb_type != P_8x8ref0 &&
             sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
             SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
             != Pred_L0) {
-            ref_idx_l1[mbPartIdx] = br.read_te(0);
+            ref_idx_l1[mbPartIdx] = br.read_te(te1);
         }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
@@ -915,6 +915,11 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
             block->parse(ctx,  mb->Intra16x16DCLevel, br);
             residual_blocks.emplace_back(block);
         }
+    }
+
+    /* some other hacks to make it consistent with JM */
+    if (mb->mb_preds.size() && mb->mb_preds[0]->intra_chroma_pred_mode) {
+        mb->CodedBlockPatternLuma = (uint64_t)MbPredLuma(mb->mb_type);
     }
 
     int blkIdx = 0;
@@ -995,20 +1000,15 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
     std::shared_ptr<MacroBlock> mb = ctx.mb;
 
     /* FIXME: this is a hack to make it the same with JM reference player */
-    bool intra_dc = false;
-    bool intra_ac = false;
-    if (MbPartWidth(mb->mb_type) == 2) {
-        intra_dc = true;
-        intra_ac = true;
-    } else if (MbPartWidth(mb->mb_type) == 1) {
-        intra_dc = true;
+    if (mb->mb_preds.size() && mb->mb_preds[0]->intra_chroma_pred_mode) {
+        mb->CodedBlockPatternChroma = (uint64_t)MbPredChroma(mb->mb_type);
     }
 
     uint64_t chroma_array_type = sps->chroma_array_type();
     if (chroma_array_type == 1 || chroma_array_type == 2) {
         int NumC8x8 = 4 / (ctx.SubWidthC() * ctx.SubHeightC());
         for (int iCbCr = 0; iCbCr < 2; iCbCr++) {
-            if ((mb->CodedBlockPatternChroma & 3 || intra_dc) && (startIdx == 0)) {
+            if ((mb->CodedBlockPatternChroma & 3) && (startIdx == 0)) {
                 if (ctx.pps->entropy_coding_mode_flag())
                     throw NotImplemented("entropy_coding_mode_flag");
                 else {
@@ -1030,7 +1030,7 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
             for (int i8x8 = 0; i8x8 < NumC8x8; i8x8++) {
                 for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                     int blkIdx = i8x8*4 + i4x4;
-                    if (mb->CodedBlockPatternChroma & 2 || intra_ac) {
+                    if (mb->CodedBlockPatternChroma & 2) {
                         if (ctx.pps->entropy_coding_mode_flag())
                             throw NotImplemented("entropy_coding_mode_flag");
                         else {
@@ -1142,8 +1142,6 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
             nC = nB;
         else
             nC = 0;
-
-
     }
     uint8_t coeff_token = read_coeff_token(nC, br);
     uint8_t TotalCoeffs   = coeff_token >> 2;

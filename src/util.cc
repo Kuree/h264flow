@@ -141,6 +141,13 @@ uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type) {
     }
 }
 
+int MbPredLuma(uint64_t mb_type) {
+    return I_Macroblock_Modes[mb_type][6];
+}
+
+int MbPredChroma(uint64_t mb_type) {
+    return I_Macroblock_Modes[mb_type][5];
+}
 
 int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type) {
     return (slice_type == SliceType::TYPE_P) ?

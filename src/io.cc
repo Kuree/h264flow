@@ -59,8 +59,8 @@ uint64_t BinaryReader::read_ue() {
 }
 
 uint64_t BinaryReader::read_te(uint64_t range) {
-    if (range > 0) {
-        return read_ue();;
+    if (range > 1) {
+        return read_ue();
     } else {
         return static_cast<uint64_t>(!read_bit_as_bool());
     }
