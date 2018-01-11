@@ -42,7 +42,6 @@ int main(int argc, char * argv[]) {
 
     if (is_mp4(filename)) {
         shared_ptr<MP4File> mp4 = make_shared<MP4File>(filename);
-        cerr << "WARN: MPEG-4/AVC is untested" << endl;
         decoder = make_unique<h264>(mp4);
     } else if(is_raw(filename)) {
         auto bs = make_shared<BitStream>(filename);
@@ -52,6 +51,12 @@ int main(int argc, char * argv[]) {
         return EXIT_FAILURE;
     }
     try {
+        uint64_t index_size = decoder->index_size();
+        if (frame_num >= index_size) {
+            cerr << "frame: " << frame_num << " outside of range ("
+                 << index_size << ")" << endl;
+            return EXIT_FAILURE;
+        }
         std::shared_ptr<MvFrame> frame = decoder->load_frame(frame_num);
         if (!frame)
             throw std::runtime_error("Not a P-slice");

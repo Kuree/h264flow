@@ -235,6 +235,36 @@ StcoBox::StcoBox(const Box &box, bool read_large) : FullBox(box), _entries() {
     }
 }
 
+StscBox::StscBox(std::shared_ptr<Box> box) : FullBox(*box.get()), _entries() {
+    std::istringstream stream(_data);
+    BinaryReader br = get_br(stream);
+    uint32_t entry_count = br.read_uint32();
+    _entries = std::vector<StscBox::SampleToChunk>(entry_count);
+    for (uint32_t i = 0; i < entry_count; i++) {
+        uint32_t first_chunk = br.read_uint32();
+        uint32_t samples_per_chunk = br.read_uint32();
+        uint32_t sample_desc_index = br.read_uint32();
+        _entries[i] = SampleToChunk {
+                first_chunk,
+                samples_per_chunk,
+                sample_desc_index
+        };
+    }
+}
+
+StszBox::StszBox(std::shared_ptr<Box> box) : FullBox(*box.get()), _entries() {
+    std::istringstream stream(_data);
+    BinaryReader br = get_br(stream);
+    uint32_t sample_size = br.read_uint32();
+    uint32_t sample_count = br.read_uint32();
+    if (sample_size == 0) {
+        _entries = std::vector<uint32_t>(sample_count);
+        for (uint32_t i = 0; i < sample_count; i++) {
+            _entries[i] = br.read_uint32();
+        }
+    }
+}
+
 SampleEntry::SampleEntry(const Box & box) : Box(box), data_reference_index_() {
     std::istringstream stream(_data);
     BinaryReader br = get_br(stream);
@@ -280,15 +310,19 @@ VisualSampleEntry::VisualSampleEntry(const Box & box) : SampleEntry(box),
 Avc1::Avc1(const Box & box) : VisualSampleEntry(box), _avcc_size(), _avcC() {
     std::istringstream stream(_data);
     BinaryReader br = get_br(stream);
-    while (true) {
+    std::string box_type = "";
+    for (int i = 0; i < 2; i++) {
+        /* two optional boxes */
         _avcc_size = br.read_uint32();
-        string type = br.read_bytes(4);
-        if (type == "avcC") {
+        box_type = br.read_bytes(4);
+        if (box_type == "avcC") {
             br.seek(br.pos() - 8);
             break;
         }
-        Box box(_avcc_size, type, br, false);
+        Box box(_avcc_size, box_type, br, false);
     }
+    if (box_type != "avcC")
+        throw std::runtime_error("avcC not found");
 
     auto b = std::make_shared<Box>(br);
     _avcC = AvcC(*b.get());

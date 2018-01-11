@@ -89,31 +89,36 @@ void h264::index_nal() {
     if (!box) box = _trak_box->find_first("co64");
     if (!box) throw std::runtime_error("stco/co64 not found");
     StcoBox stco = StcoBox(*box.get());
-    /* ffmpeg will produce broken stco sometimes */
-    if (stco.chunk_offsets().size() < 3) {
-        /* this will only happen when all the mdat data are used for NAT */
-        /* TODO: fix this with length size */
-        box = _mp4->find_first("mdat");
-        std::string str = _mp4->extract_stream(box->data_offset(), box->size());
-        std::istringstream stream(str);
-        BinaryReader br(stream);
-        uint64_t offset = box->data_offset();
-        _chunk_offsets.emplace_back(offset); /* the first one */
-        std::cout << std::hex << offset << std::endl;
-        while (!br.eof()) {
-            uint64_t size = read_nal_size(br);
-            if (!size) return;
-            offset += size;
-            _chunk_offsets.emplace_back(offset);
-            std::cout << "offset: " << std::hex << offset << " size: " << size << std::endl;
-            br.seek(br.pos() + size);
-        }
-    } else {
-        for (uint64_t offset : stco.chunk_offsets()) {
-            /* TODO: build a table from frame_num to a list of offsets */
-            _chunk_offsets.emplace_back(offset);
+    box = _trak_box->find_first("stsc");
+    if (!box) throw std::runtime_error("stsc not found");
+    StscBox stsc = StscBox(box);
+    box = _trak_box->find_first("stsz");
+    if (!box) throw std::runtime_error("stsz not found");
+    StszBox stsz = StszBox(box);
+
+    auto sample_entries = stsz.entries();
+    _chunk_offsets = std::vector<uint64_t>(sample_entries.size());
+    uint32_t chunk_count = 0;
+    uint32_t stsc_index = 0;
+    uint32_t samples_per_chunk = stsc.entries()[stsc_index].samples_per_chunk;
+    uint64_t in_chunk_offset = 0;
+    for (uint32_t i = 0; i < sample_entries.size(); i++) {
+        uint32_t sample_size = sample_entries[i];
+        _chunk_offsets[i] = stco.chunk_offsets()[chunk_count] + in_chunk_offset;
+        in_chunk_offset += sample_size;
+
+        if (!samples_per_chunk) {
+            /* switch chunk */
+            chunk_count++;
+            in_chunk_offset = 0;
+            if (stsc_index + 1 < stsc.entries().size()
+                && stsc.entries()[stsc_index + 1].first_chunk - 1 == chunk_count) {
+                stsc_index++;
+                samples_per_chunk = stsc.entries()[stsc_index].samples_per_chunk;
+            }
         }
     }
+
 }
 
 h264::h264(std::shared_ptr<BitStream> stream)

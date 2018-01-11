@@ -213,7 +213,7 @@ private:
 
 class Avc1 : public VisualSampleEntry {
 public:
-    Avc1(const Box & box);
+    explicit Avc1(const Box & box);
 
     uint32_t avcc_size() { return _avcc_size; }
     AvcC & avcC() { return _avcC; }
@@ -221,6 +221,29 @@ private:
     /* for avcC */
     uint32_t _avcc_size;
     AvcC _avcC;
+};
+
+class StscBox : public FullBox {
+public:
+    explicit StscBox(std::shared_ptr<Box> box);
+
+    struct SampleToChunk {
+        uint32_t first_chunk;
+        uint32_t samples_per_chunk;
+        uint32_t sample_description_index;
+    };
+
+    std::vector<StscBox::SampleToChunk> entries() { return _entries; }
+private:
+    std::vector<StscBox::SampleToChunk> _entries;
+};
+
+class StszBox : public FullBox {
+public:
+    explicit StszBox(std::shared_ptr<Box> box);
+    std::vector<uint32_t> entries() { return _entries; }
+private:
+    std::vector<uint32_t> _entries;
 };
 
 class MP4File {
