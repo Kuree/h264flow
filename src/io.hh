@@ -62,6 +62,7 @@ public:
     bool read_bit_as_bool() { return static_cast<bool>(read_bit()); }
     uint8_t bit_pos() const { return _bit_pos; }
     void set_bit_pos(uint8_t bit_pos);
+    int64_t bits_left();
 
     /* io functions */
     uint64_t pos() { return (uint64_t)_stream.tellg(); }

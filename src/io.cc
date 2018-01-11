@@ -133,6 +133,10 @@ uint64_t BinaryReader::next_bits(uint64_t bits) {
     return result;
 }
 
+int64_t BinaryReader::bits_left() {
+    return (size() - pos()) * 8 - _bit_pos;
+}
+
 void BinaryWriter::write_uint8(uint8_t value) {
     auto buf = reinterpret_cast<char *>(&value);
     _stream.write(buf, sizeof(value));

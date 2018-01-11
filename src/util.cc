@@ -44,12 +44,15 @@ uint8_t read_coeff_token(int nC, BinaryReader & br) {
     int tab = (nC == -2) ? 4 : (nC == -1) ? 3 : (nC < 2) ? 0 : (nC < 4) ? 1 : (nC < 8) ? 2 : 5;
 
     /* optimize next bits to save disk seek */
-    uint64_t next_bytes = br.next_bits(16);
+    //uint64_t next_bytes = br.next_bits(16);
+    int64_t bits_left = br.bits_left();
     for (int TrailingOnes = 0; TrailingOnes < 4; TrailingOnes++) {
         for (int TotalCoeff = 0; TotalCoeff < 17; TotalCoeff++) {
             uint32_t length = coeff_token_length[tab][TrailingOnes][TotalCoeff];
             uint32_t code   = coeff_token_code[tab][TrailingOnes][TotalCoeff];
-            uint64_t next_bits = next_bytes >> (16 - length);
+            //uint64_t next_bits = next_bytes >> (16 - length);
+            if ((int)length > (bits_left - 1)) continue; /* 1 bit for stopping bit */
+            uint64_t next_bits = br.next_bits(length);
             if (length > 0 && next_bits == code) {
                 br.read_bits(length);
                 return (uint8_t)((TotalCoeff << 2) | (TrailingOnes));
@@ -71,10 +74,11 @@ int code_from_bitstream_2d(BinaryReader &br,
                            const int tabwidth, const int tabheight) {
     const uint8_t *len = &lentab[0];
     const uint8_t *cod = &codtab[0];
-    uint64_t next_bytes = br.next_bits(16);
+    int64_t bits_left = br.bits_left() - 1; /* 1 for stopping bit */
     for (int j = 0; j < tabheight; j++) {
         for (int i = 0; i < tabwidth; i++) {
-            uint64_t next_bits = next_bytes >> (16 - *len);
+            if (*len > bits_left) continue;
+            uint64_t next_bits = br.next_bits(*len);
             if ((*len == 0) || (next_bits != *cod)) {
                 ++len;
                 ++cod;

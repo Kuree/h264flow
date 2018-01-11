@@ -70,8 +70,7 @@ public:
 
     void index_nal();
     std::shared_ptr<MvFrame> load_frame(uint64_t frame_num);
-    uint64_t index_size()
-    { if (!_chunk_offsets.size()) index_nal(); return _chunk_offsets.size(); }
+    uint64_t index_size();
 private:
     uint8_t _length_size = 4;
     std::vector<uint64_t> _chunk_offsets;

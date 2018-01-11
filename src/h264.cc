@@ -104,7 +104,8 @@ void h264::index_nal() {
     uint64_t in_chunk_offset = 0;
     for (uint32_t i = 0; i < sample_entries.size(); i++) {
         uint32_t sample_size = sample_entries[i];
-        _chunk_offsets[i] = stco.chunk_offsets()[chunk_count] + in_chunk_offset;
+        uint64_t result = stco.chunk_offsets()[chunk_count] + in_chunk_offset;
+        _chunk_offsets[i] = result;
         in_chunk_offset += sample_size;
 
         if (!samples_per_chunk) {
@@ -155,6 +156,16 @@ uint64_t h264::read_nal_size(BinaryReader &br) {
         throw std::runtime_error("unsupported length size");
     }
     return unit_size;
+}
+
+uint64_t h264::index_size() {
+    if (_bit_stream) {
+        return _bit_stream->chunk_offsets().size();
+    } else {
+        if (!_chunk_offsets.size())
+            index_nal();
+        return _chunk_offsets.size();
+    }
 }
 
 std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
