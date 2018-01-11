@@ -37,6 +37,7 @@ static const std::set<std::string> mp4_container_boxes{
 class Box {
 public:
     explicit Box(BinaryReader & br) : Box(br, true) {}
+    Box(uint32_t size, std::string type, BinaryReader &br, bool read_data);
     Box(BinaryReader & br, bool read_data);
     explicit Box() : _data(), _size(), _type(), _children() {}
     Box(const Box & box);
@@ -70,6 +71,7 @@ protected:
 
 private:
     uint64_t _data_offset = 0;
+    void parse_box(BinaryReader &br, bool read_data);
 };
 
 

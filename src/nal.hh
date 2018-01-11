@@ -469,9 +469,9 @@ public:
     uint64_t mb_type = P_Skip; /* default to skip */
     bool transform_size_8x8_flag = false;
 
-    std::vector<std::shared_ptr<MbPred>> mb_preds;
-    std::vector<std::shared_ptr<SubMbPred>> sub_mb_preds;
-    std::shared_ptr<Residual> residual = nullptr;
+    std::unique_ptr<MbPred> mb_pred;
+    std::vector<std::unique_ptr<SubMbPred>> sub_mb_preds;
+    std::unique_ptr<Residual> residual = nullptr;
     bool mb_field_decoding_flag;
     int64_t mb_qp_delta = 0;
     uint64_t mb_addr;
@@ -539,7 +539,7 @@ class ParserContext {
 public:
     ParserContext(std::shared_ptr<SPS_NALUnit> sps,
                   std::shared_ptr<PPS_NALUnit> pps) : sps(sps), pps(pps),
-                                                      mb_array(PicSizeInMbs()) {}
+                                                      mb_array() {}
     std::shared_ptr<SPS_NALUnit> sps;
     std::shared_ptr<PPS_NALUnit> pps;
     std::shared_ptr<MacroBlock> mb = nullptr;

@@ -166,3 +166,10 @@ uint64_t MbPartWidth(uint64_t mb_type) {
 uint64_t MbPartHeight(uint64_t mb_type) {
     return P_and_SP_macroblock_modes[mb_type][6];
 }
+
+bool is_p_slice(uint8_t first_byte) {
+    if (first_byte & 0x80)
+        throw std::runtime_error("forbidden 0 bit is set");
+    int nal_unit_type = first_byte & 0x1F;
+    return nal_unit_type >= 1 && nal_unit_type <= 4;
+}

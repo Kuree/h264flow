@@ -153,9 +153,6 @@ uint64_t h264::read_nal_size(BinaryReader &br) {
 }
 
 std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
-    /* TODO: this is not actually frame_num, need to strip down slice_header
-     * TODO: to obtain the actual frame_num (see TODO in index_nal()
-     */
     std::string nal_data;
     if (_bit_stream) {
         uint64_t pos, size;
@@ -172,6 +169,9 @@ std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
         nal_data = _mp4->extract_stream(offset + _length_size,
                                                     unit_size);
     }
+    /* test the slice type */
+    if (!is_p_slice(nal_data[0]))
+        return nullptr;
     ParserContext ctx(_sps, _pps);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
@@ -245,7 +245,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
                     auto mb_pred_mode = MbPartPredMode(mb_type, mbPartIdx,
                                                        slice_type);
                     if (mb_pred_mode == Pred_L0 || mb_pred_mode == BiPred) {
-                        refIdxL0 = (int) mb->mb_preds[0]->ref_idx_l0[mbPartIdx];
+                        refIdxL0 = (int) mb->mb_pred->ref_idx_l0[mbPartIdx];
                         predFlagL0 = true;
                     } else {
                         refIdxL0 = -1;
@@ -253,7 +253,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
                     }
 
                     if (mb_pred_mode == Pred_L1 || mb_pred_mode == BiPred) {
-                        refIdxL1 = (int) mb->mb_preds[0]->ref_idx_l1[mbPartIdx];
+                        refIdxL1 = (int) mb->mb_pred->ref_idx_l1[mbPartIdx];
                         predFlagL1 = true;
                     } else {
                         refIdxL1 = -1;
@@ -264,18 +264,18 @@ void h264::process_inter_mb(ParserContext &ctx) {
                         int mvpL0[2] = {0, 0};
                         process_luma_mv(ctx, mbPartIdx, 0, mvpL0);
                         mvL0[0] = (int) (mvpL0[0] +
-                                         mb->mb_preds[0]->mvd_l0[mbPartIdx][subMbPartIdx][0]);
+                                         mb->mb_pred->mvd_l0[mbPartIdx][subMbPartIdx][0]);
                         mvL0[1] = (int) (mvpL0[1] +
-                                         mb->mb_preds[0]->mvd_l0[mbPartIdx][subMbPartIdx][1]);
+                                         mb->mb_pred->mvd_l0[mbPartIdx][subMbPartIdx][1]);
                     }
 
                     if (predFlagL1) {
                         int mvpL1[2] = {0, 0};
                         process_luma_mv(ctx, mbPartIdx, 1, mvpL1);
                         mvL1[0] = (int) (mvpL1[0] +
-                                         mb->mb_preds[0]->mvd_l1[mbPartIdx][subMbPartIdx][0]);
+                                         mb->mb_pred->mvd_l1[mbPartIdx][subMbPartIdx][0]);
                         mvL1[1] = (int) (mvpL1[1] +
-                                         mb->mb_preds[0]->mvd_l1[mbPartIdx][subMbPartIdx][1]);
+                                         mb->mb_pred->mvd_l1[mbPartIdx][subMbPartIdx][1]);
                     }
                 }
 

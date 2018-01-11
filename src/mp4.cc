@@ -33,6 +33,20 @@ Box::Box(BinaryReader &br, bool read_data) : _data(), _size(), _type(),
     _size = br.read_uint32(true);
     _type = br.read_bytes(4);
 
+    parse_box(br, read_data);
+}
+
+Box::Box(uint32_t size, std::string type, BinaryReader &br, bool read_data)
+        : _data(), _size(size), _type(type), _children() {
+    parse_box(br, read_data);
+}
+
+Box::Box(const Box & box) : _data(box._data), _size(box._size),
+                            _type(box._type), _children() {}
+
+Box::Box(std::shared_ptr<Box> box) : Box(*box.get()) {}
+
+void Box::parse_box(BinaryReader &br, bool read_data) {
     _data_offset = br.pos(); /* used to get data from mp4 stream */
 
     if (mp4_container_boxes.find(_type) != mp4_container_boxes.end()) {
@@ -48,11 +62,6 @@ Box::Box(BinaryReader &br, bool read_data) : _data(), _size(), _type(),
         br.seek(dst_pos);
     }
 }
-
-Box::Box(const Box & box) : _data(box._data), _size(box._size),
-                            _type(box._type), _children() {}
-
-Box::Box(std::shared_ptr<Box> box) : Box(*box.get()) {}
 
 void Box::add_child(std::shared_ptr<Box> box) {
     if (box->type() == "stsd") {
@@ -271,15 +280,16 @@ VisualSampleEntry::VisualSampleEntry(const Box & box) : SampleEntry(box),
 Avc1::Avc1(const Box & box) : VisualSampleEntry(box), _avcc_size(), _avcC() {
     std::istringstream stream(_data);
     BinaryReader br = get_br(stream);
-    uint64_t pos = br.pos();
-    _avcc_size = br.read_uint32();
-    string type = br.read_bytes(4);
-
-    if (type != "avcC") {
-        throw std::runtime_error("avcC does not follow AVC1 immediately");
+    while (true) {
+        _avcc_size = br.read_uint32();
+        string type = br.read_bytes(4);
+        if (type == "avcC") {
+            br.seek(br.pos() - 8);
+            break;
+        }
+        Box box(_avcc_size, type, br, false);
     }
 
-    br.seek(pos);
     auto b = std::make_shared<Box>(br);
     _avcC = AvcC(*b.get());
 }

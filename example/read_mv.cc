@@ -15,22 +15,46 @@
  */
 
 #include "../src/h264.hh"
-#include "../src/util.hh"
+#include <experimental/filesystem>
 
 using namespace std;
+namespace fs = std::experimental::filesystem;
+
+bool is_mp4(char * filename) {
+    fs::path path(filename);
+    return path.extension().string() == ".mp4";
+}
+
+bool is_raw(char * filename) {
+    fs::path path(filename);
+    return path.extension().string() == ".264"
+           || path.extension().string() == ".h264";
+}
 
 int main(int argc, char * argv[]) {
     if (argc != 3) {
         cerr << "Usage: " << argv[0] << " <file_name> <frame_number>" << endl;
         return EXIT_FAILURE;
     }
-    std::string filename = argv[1];
+    char * filename = argv[1];
     uint32_t frame_num = (uint32_t)stoi(argv[2]);
-    cerr << "WARN: MPEG-4/AVC is untested" << endl;
-    auto bs = make_shared<BitStream>(filename);
-    h264 decoder(bs);
+    unique_ptr<h264> decoder = nullptr;
+
+    if (is_mp4(filename)) {
+        shared_ptr<MP4File> mp4 = make_shared<MP4File>(filename);
+        cerr << "WARN: MPEG-4/AVC is untested" << endl;
+        decoder = make_unique<h264>(mp4);
+    } else if(is_raw(filename)) {
+        auto bs = make_shared<BitStream>(filename);
+        decoder = make_unique<h264>(bs);
+    } else {
+        cerr << "Unsupported file format" << endl;
+        return EXIT_FAILURE;
+    }
     try {
-        std::shared_ptr<MvFrame> frame = decoder.load_frame(frame_num);
+        std::shared_ptr<MvFrame> frame = decoder->load_frame(frame_num);
+        if (!frame)
+            throw std::runtime_error("Not a P-slice");
         cout << "Frame size: " << frame->width() << "x" << frame->height()
              << endl;
         uint32_t counter = 0;
@@ -46,7 +70,6 @@ int main(int argc, char * argv[]) {
             }
         }
     } catch (const NotImplemented & ex) {
-        cerr << "ERROR " << ex.what()
-             << endl << "Please make sure it's a P-slice" << endl;
+        cerr << "ERROR " << ex.what() << endl;
     }
 }

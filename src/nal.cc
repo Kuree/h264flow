@@ -581,7 +581,7 @@ std::vector<uint64_t> SliceData::slice_group_map(
 }
 
 MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
-        : mb_preds(), sub_mb_preds(),
+        : mb_pred(), sub_mb_preds(),
           mb_field_decoding_flag(mb_field_decoding_flag),
           mb_addr(curr_mb_addr) {
     memset(TotalCoeffs_luma, 0, sizeof(int) * 16);
@@ -629,10 +629,10 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
         if (mb_type != I_NxN
             && MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16
             && NumMbPart(mb_type) == 4) {
-            auto sub_mb_pred = std::make_shared<SubMbPred>();
-            sub_mb_pred->parse(ctx, br);
+            SubMbPred sub_mb_pred;
+            sub_mb_pred.parse(ctx, br);
             for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++ ) {
-                if (sub_mb_pred->sub_mb_type[mbPartIdx] != B_Direct_8x8)
+                if (sub_mb_pred.sub_mb_type[mbPartIdx] != B_Direct_8x8)
                     noSubMbPartSizeLessThan8x8Flag = false;
                 else if (!sps->direct_8x8_inference_flag())
                     noSubMbPartSizeLessThan8x8Flag = false;
@@ -645,9 +645,8 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
                 transform_size_8x8_flag = br.read_bit_as_bool();
             }
             // mb_pred
-            auto mb_pred = std::make_shared<MbPred>();
+            mb_pred = std::make_unique<MbPred>();
             mb_pred->parse(ctx, br);
-            mb_preds.emplace_back(mb_pred);
         }
 
         if (MbPartPredMode(mb_type, 0, header->slice_type) != Intra_16x16) {
@@ -690,7 +689,7 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
                 is_intra) {
             mb_qp_delta = br.read_se();
             /* residual here */
-            residual = std::make_shared<Residual>(0, 15);
+            residual = std::make_unique<Residual>(0, 15);
             residual->parse(ctx, br);
         }
 
