@@ -19,15 +19,6 @@
 
 using namespace std;
 
-bool is_mp4(const char * filename) {
-    return file_extension(filename) == ".mp4";
-}
-
-bool is_raw(const char * filename) {
-    return file_extension(filename) == ".264"
-           || file_extension(filename) == ".h264";
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 8) {
         cerr << "Usage: " << argv[0] << "<filename> <frame_num> <rect_x> "
@@ -40,18 +31,7 @@ int main(int argc, char *argv[]) {
     const uint32_t width = (uint32_t)stoi(argv[5]);
     const uint32_t height = (uint32_t)stoi(argv[6]);
     const uint32_t threshold = (uint32_t)stoi(argv[7]);
-    unique_ptr<h264> decoder = nullptr;
-
-    if (is_mp4(filename)) {
-        shared_ptr<MP4File> mp4 = make_shared<MP4File>(filename);
-        decoder = make_unique<h264>(mp4);
-    } else if(is_raw(filename)) {
-        auto bs = make_shared<BitStream>(filename);
-        decoder = make_unique<h264>(bs);
-    } else {
-        cerr << "Unsupported file format" << endl;
-        return EXIT_FAILURE;
-    }
+    unique_ptr<h264> decoder = make_unique<h264>(filename);
 
     auto frame = decoder->load_frame(frame_num);
     if (frame != nullptr) {

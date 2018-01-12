@@ -51,9 +51,26 @@ std::string BitStream::extract_stream(uint64_t position, uint64_t size) {
     return br.read_bytes(size);
 }
 
-h264::h264(std::shared_ptr<MP4File> mp4) : _chunk_offsets(), _mp4(mp4) {
-    if (!mp4) throw std::runtime_error("mp4 is nullptr");
-    auto tracks = mp4->find_all("trak");
+h264::h264(const std::string &filename) : _chunk_offsets() {
+    auto ext = file_extension(filename);
+    if (ext == ".mp4") {
+        _mp4 = std::make_shared<MP4File>(filename);
+        load_mp4();
+    } else if(ext == ".264" || ext == ".h264") {
+        _bit_stream = std::make_shared<BitStream>(filename);
+        load_bitstream();
+    } else {
+        throw std::runtime_error("unsupported media file extension");
+    }
+}
+
+h264::h264(std::shared_ptr<MP4File> mp4) : _chunk_offsets(), _mp4(std::move(mp4)) {
+    load_mp4();
+}
+
+void h264::load_mp4() {
+    if (!_mp4) throw std::runtime_error("mp4 is nullptr");
+    auto tracks = _mp4->find_all("trak");
     std::shared_ptr<Box> box = nullptr;
     for (const auto & track : tracks) {
         auto b = track->find_first("avc1");
@@ -121,11 +138,15 @@ void h264::index_nal() {
 
 h264::h264(std::shared_ptr<BitStream> stream)
         : _chunk_offsets(), _bit_stream(stream) {
-    for (const auto & pair : stream->chunk_offsets()) {
+    load_bitstream();
+}
+
+void h264::load_bitstream() {
+    for (const auto & pair : _bit_stream->chunk_offsets()) {
         /* linear search. however, since most sps and pps are at the very
          * beginning, this is actually pretty fast
          */
-        std::string data = stream->extract_stream(pair.first, pair.second);
+        std::string data = _bit_stream->extract_stream(pair.first, pair.second);
         NALUnit unit(std::move(data));
         if (unit.nal_unit_type() == 7) {
             _sps = std::make_shared<SPS_NALUnit>(unit);

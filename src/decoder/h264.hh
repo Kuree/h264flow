@@ -72,6 +72,7 @@ private:
 
 class h264 {
 public:
+    explicit h264(const std::string &filename);
     explicit h264(std::shared_ptr<MP4File> mp4);
     explicit h264(std::shared_ptr<BitStream> stream);
 
@@ -102,6 +103,9 @@ private:
                          int listSuffixFlag, int (&mvL)[2]);
 
     std::shared_ptr<MvFrame> produce_mv(ParserContext & ctx);
+
+    void load_bitstream();
+    void load_mp4();
 };
 
 
