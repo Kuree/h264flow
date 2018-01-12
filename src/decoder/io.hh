@@ -105,6 +105,71 @@ private:
     }
 };
 
+class BitReader {
+public:
+    explicit BitReader(std::string data) : _data(std::move(data)) {}
+    inline uint64_t pos() { return _pos; }
+    inline uint8_t bit_pos() { return _bit_pos; }
+    inline uint64_t size() { return _data.size(); }
+    inline void seek(uint64_t pos) { _pos = pos; _bit_pos = 0; }
+    inline void set_bit_pos(uint8_t bit_pos) { _bit_pos = bit_pos; }
+    bool read_bit_as_bool() { return static_cast<bool>(read_bit()); }
+    inline uint8_t read_uint8() { return (uint8_t)_data[_pos++]; }
+    /* TODO: escape RBSP */
+    inline uint8_t read_bit()
+    {
+        auto tmp = (uint8_t)_data[_pos];
+        tmp = (uint8_t)((tmp >> (7 - _bit_pos)) & 1);
+        ++_bit_pos;
+        if (_bit_pos == 8) { _bit_pos = 0; ++_pos; }
+        return tmp;
+    }
+
+    inline uint64_t read_ue() {
+        uint8_t num_zero = 0;
+        uint64_t result;
+        while(!read_bit())
+            num_zero++;
+        result = 1 << num_zero | read_bits(num_zero);
+        return result - 1;
+    }
+
+    inline uint64_t read_bits(uint64_t bits) {
+        uint64_t result = 0;
+        for (int i = bits - 1; i >= 0; i--) {
+            uint8_t  bit = read_bit();
+            result |= bit << i;
+        }
+        return result;
+    }
+
+    inline uint64_t next_bits(uint64_t bits) {
+        uint64_t curr_pos = _pos;
+        uint8_t bit_pos = _bit_pos;
+        uint64_t result = read_bits(bits);
+        _pos = curr_pos;
+        _bit_pos = bit_pos;
+        return result;
+    }
+
+    inline uint64_t read_te(uint64_t range) {
+        if (range > 1) {
+            return read_ue();
+        } else {
+            return static_cast<uint64_t>(!read_bit_as_bool());
+        }
+    }
+
+    int64_t read_se();
+
+    inline int64_t bits_left() { return (_data.size() - _pos) * 8 - _bit_pos; }
+
+private:
+    std::string _data;
+    uint64_t _pos = 0;
+    uint8_t _bit_pos = 0;
+};
+
 class BinaryWriter {
 public:
     explicit BinaryWriter(std::ostream & stream) : _stream(stream) {}

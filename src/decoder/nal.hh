@@ -252,7 +252,7 @@ class RefPicListModification {
 public:
     /* TODO: refactor this after decoding is finished */
     RefPicListModification();
-    RefPicListModification(uint64_t slice_type, BinaryReader & br);
+    RefPicListModification(uint64_t slice_type, BitReader & br);
     bool ref_pic_list_modification_flag_l0 = false;
     bool ref_pic_list_modification_flag_l1 = false;
     std::vector<uint64_t> modification_of_pic_nums_idc;
@@ -268,7 +268,7 @@ public:
     PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
                     std::shared_ptr<PPS_NALUnit> pps,
                     uint64_t slice_type,
-                    BinaryReader & br);
+                    BitReader & br);
     uint64_t luma_log2_weight_denom = 0;
     uint64_t chroma_log2_weight_denom = 0;
     std::vector<int64_t> luma_weight_l0;
@@ -284,7 +284,7 @@ public:
 class DecRefPicMarking {
 public:
     DecRefPicMarking();
-    DecRefPicMarking(const NALUnit &unit, BinaryReader &br);
+    DecRefPicMarking(const NALUnit &unit, BitReader &br);
     bool no_output_of_prior_pics_flag = false;
     bool long_term_reference_flag = false;
     bool adaptive_ref_pic_marking_mode_flag = false;
@@ -306,7 +306,7 @@ public:
     { return std::make_pair<uint64_t, uint8_t>(
                 (uint64_t)_header_size[0], (uint8_t)_header_size[1]); }
 
-    void parse(ParserContext & ctx, BinaryReader &br);
+    void parse(ParserContext & ctx, BitReader &br);
 private:
     uint64_t _header_size[2] = {0, 0};
     std::string _data;
@@ -347,7 +347,7 @@ public:
 class SliceData {
 public:
     explicit SliceData(const Slice_NALUnit & nal) : _nal(nal) {}
-    void parse(ParserContext & ctx, BinaryReader & br);
+    void parse(ParserContext & ctx, BitReader & br);
 private:
     const Slice_NALUnit & _nal;
 
@@ -361,7 +361,7 @@ private:
     std::vector<uint64_t> slice_group_map(std::shared_ptr<SPS_NALUnit> sps,
                                           std::shared_ptr<PPS_NALUnit> pps);
 
-    bool more_rbsp_data(BinaryReader & br);
+    bool more_rbsp_data(BitReader & br);
     void find_trailing_bit();
     uint64_t _trailing_bit = 0;
 };
@@ -371,7 +371,7 @@ class MbPred {
 public:
     MbPred();
 
-    void parse(ParserContext &ctx, BinaryReader &br);
+    void parse(ParserContext &ctx, BitReader &br);
 
     bool prev_intra4x4_pred_mode_flag[16];
     uint8_t rem_intra4x4_pred_mode[16];
@@ -386,7 +386,7 @@ public:
 class SubMbPred {
 public:
     SubMbPred() = default;
-    void parse(ParserContext &ctx, BinaryReader &br);
+    void parse(ParserContext &ctx, BitReader &br);
     uint64_t sub_mb_type[4];
     uint64_t ref_idx_l0[4];
     uint64_t ref_idx_l1[4];
@@ -403,7 +403,7 @@ public:
               max_num_coeff(max_num_coeff), block_type(block_type),
               block_index(block_index) {}
 
-    void parse(ParserContext &ctx, int * coeffLevel, BinaryReader &br);
+    void parse(ParserContext &ctx, int * coeffLevel, BitReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
@@ -447,12 +447,12 @@ public:
     Residual(uint32_t start_index, uint32_t end_index)
             : start_index(start_index), end_index(end_index),
               residual_blocks() {}
-    void parse(ParserContext &ctx, BinaryReader & br);
+    void parse(ParserContext &ctx, BitReader & br);
 
     void residual_luma(ParserContext &ctx, const int startIdx,
-                       const int endIdx, BinaryReader &br);
+                       const int endIdx, BitReader &br);
     void residual_chroma(ParserContext &ctx, const int startIdx,
-                       const int endIdx, BinaryReader &br);
+                       const int endIdx, BitReader &br);
 
     uint32_t start_index;
     uint32_t end_index;
@@ -465,7 +465,7 @@ public:
     MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr);
     MacroBlock(ParserContext & ctx, bool mb_field_decoding_flag,
                uint64_t curr_mb_addr);
-    void parse(ParserContext &ctx, BinaryReader &br);
+    void parse(ParserContext &ctx, BitReader &br);
     uint64_t mb_type = P_Skip; /* default to skip */
     bool transform_size_8x8_flag = false;
 

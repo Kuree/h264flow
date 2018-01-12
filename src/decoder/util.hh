@@ -36,20 +36,20 @@ public:
  */
 uint64_t intlog2(uint64_t x);
 
-uint8_t read_coeff_token(int nC, BinaryReader & br);
+uint8_t read_coeff_token(int nC, BitReader & br);
 
-uint8_t read_ce_levelprefix(BinaryReader &br);
+uint8_t read_ce_levelprefix(BitReader &br);
 
-int code_from_bitstream_2d(BinaryReader &br,
+int code_from_bitstream_2d(BitReader &br,
                                   const uint8_t *lentab, const uint8_t *codtab,
                                   const int tabwidth, const int tabheight);
 
-int read_ce_totalzeros(BinaryReader &br, const int vlcnum,
+int read_ce_totalzeros(BitReader &br, const int vlcnum,
                               const int chromadc);
 
-int read_ce_runbefore(BinaryReader &br, const int vlcnum);
+int read_ce_runbefore(BitReader &br, const int vlcnum);
 
-void read_rbsp_trailing_bits(BinaryReader &br);
+void read_rbsp_trailing_bits(BitReader &br);
 
 inline int InverseRasterScan_x(const int a, const int b, const int,
                                const int d) {

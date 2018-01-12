@@ -142,6 +142,12 @@ void BinaryWriter::write_uint8(uint8_t value) {
     _stream.write(buf, sizeof(value));
 }
 
+int64_t BitReader::read_se() {
+    uint64_t value = read_ue();
+    auto result = static_cast<int64_t>(std::ceil(value / 2.0));
+    return value % 2 ? result : -result;
+}
+
 void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size) {
     uint8_t zero_count = 0;
     uint64_t stop_pos = size ? br.pos() + size : br.size();

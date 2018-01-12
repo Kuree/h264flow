@@ -145,8 +145,7 @@ PPS_NALUnit::PPS_NALUnit(NALUnit &unit) : NALUnit(unit) , _run_length_minus1(),
 }
 
 void PPS_NALUnit::parse() {
-    std::stringstream stream(_data);
-    BinaryReader br(stream);
+    BitReader br(_data);
 
     _pps_id = br.read_ue();
     _sps_id = br.read_ue();
@@ -189,13 +188,13 @@ void PPS_NALUnit::parse() {
     _deblocking_filter_control_present_flag = br.read_bit_as_bool();
     _constrained_intra_pred_flag = br.read_bit_as_bool();
     _redundant_pic_cnt_present_flag = br.read_bit_as_bool();
-    if (!br.eof()) {
+    //if (!br.eof()) {
         //_transform_8x8_mode_flag = br.read_bit_as_bool();
         //_pic_scaling_matrix_present_flag = br.read_bit_as_bool();
         //if (_pic_scaling_matrix_present_flag)
         //    throw NotImplemented("pic_scaling_matrix_present_flag");
         /* the rest is not parsed */
-    }
+    //}
 
 }
 
@@ -210,15 +209,14 @@ Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
     _slice_data = std::make_shared<SliceData>(*this);
 }
 
-void Slice_NALUnit::parse(ParserContext & ctx) {
-    std::stringstream stream(_data);
-    BinaryReader br(stream);
+void Slice_NALUnit::parse(ParserContext & ctx) {;
+    BitReader br(_data);
     _header->parse(ctx, br);
     ctx.set_header(_header);
     _slice_data->parse(ctx, br);
 }
 
-void SliceHeader::parse(ParserContext &ctx, BinaryReader &br) {
+void SliceHeader::parse(ParserContext &ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
 
@@ -314,7 +312,7 @@ RefPicListModification::RefPicListModification()
           long_term_pic_num(), abs_diff_view_idx_minus1() {}
 
 RefPicListModification::RefPicListModification(uint64_t slice_type,
-                                               BinaryReader &br)
+                                               BitReader &br)
         :RefPicListModification() {
     if (slice_type % 5 != 2 && slice_type % 5 != 4) {
         ref_pic_list_modification_flag_l0 = br.read_bit_as_bool();
@@ -358,7 +356,7 @@ PredWeightTable::PredWeightTable() : luma_weight_l0(), luma_offset_l0(),
 PredWeightTable::PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
                                  std::shared_ptr<PPS_NALUnit> pps,
                                  uint64_t slice_type,
-                                 BinaryReader &br) : PredWeightTable() {
+                                 BitReader &br) : PredWeightTable() {
     luma_log2_weight_denom = br.read_ue();
     if (sps->chroma_array_type())
         chroma_log2_weight_denom = br.read_ue();
@@ -415,7 +413,7 @@ DecRefPicMarking::DecRefPicMarking() :memory_management_control_operation(),
                                       long_term_frame_idx(),
                                       max_long_term_frame_idx_plus1() {}
 
-DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
+DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BitReader &br)
         : DecRefPicMarking() {
     if (unit.idr_pic_flag()) {
         no_output_of_prior_pics_flag = br.read_bit_as_bool();
@@ -441,8 +439,7 @@ DecRefPicMarking::DecRefPicMarking(const NALUnit &unit, BinaryReader &br)
 }
 
 void SliceData::find_trailing_bit() {
-    std::istringstream stream(_nal.data());
-    BinaryReader br(stream);
+    BitReader br(_nal.data());
     uint64_t pos = br.size() - 1;
     /* search from the back */
     while (true) {
@@ -458,18 +455,18 @@ void SliceData::find_trailing_bit() {
     }
 }
 
-bool SliceData::more_rbsp_data(BinaryReader &br) {
+bool SliceData::more_rbsp_data(BitReader &br) {
     if (!_trailing_bit)
         find_trailing_bit();
     return (br.pos() * 8 + br.bit_pos()) < _trailing_bit;
 }
 
-void SliceData::parse(ParserContext & ctx, BinaryReader &br) {
+void SliceData::parse(ParserContext & ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
     if (pps->entropy_coding_mode_flag())
-        br.reset_bit();
+        throw NotImplemented("entropy_coding_mode_flag");
     bool mbaff_frame_flag = this->mbaff_frame_flag(sps, header);
     uint64_t curr_mb_addr = header->first_mb_in_slice * (1 + mbaff_frame_flag);
     bool more_data_flag = true;
@@ -606,7 +603,7 @@ MacroBlock::MacroBlock(ParserContext &ctx, bool mb_field_decoding_flag,
     assign_pos(ctx);
 }
 
-void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
+void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -614,7 +611,7 @@ void MacroBlock::parse(ParserContext & ctx, BinaryReader &br) {
 
     mb_type = br.read_ue();
     if (mb_type == I_PCM) {
-        br.reset_bit(true);
+        br.set_bit_pos(0);
         uint64_t bit_depth_luma = 8 + sps->bit_depth_luma_minus8();
         /* PCM luma */
         for (int i = 0; i < 256; i++) {
@@ -784,7 +781,7 @@ MbPred::MbPred() {
     }
 }
 
-void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
+void MbPred::parse(ParserContext &ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -836,7 +833,7 @@ void MbPred::parse(ParserContext &ctx, BinaryReader &br) {
 }
 
 
-void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
+void SubMbPred::parse(ParserContext &ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -889,7 +886,7 @@ void SubMbPred::parse(ParserContext &ctx, BinaryReader &br) {
     }
 }
 
-void Residual::parse(ParserContext &ctx, BinaryReader &br) {
+void Residual::parse(ParserContext &ctx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -900,7 +897,7 @@ void Residual::parse(ParserContext &ctx, BinaryReader &br) {
 }
 
 void Residual::residual_luma(ParserContext &ctx, const int startIdx,
-                             const int endIdx, BinaryReader &br) {
+                             const int endIdx, BitReader &br) {
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     std::shared_ptr<SliceHeader> header = ctx.header();
     if (startIdx == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
@@ -997,7 +994,7 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
 }
 
 void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
-                               const int endIdx, BinaryReader &br) {
+                               const int endIdx, BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     std::shared_ptr<SliceHeader> header = ctx.header();
@@ -1065,7 +1062,7 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
 
 /* taken from https://github.com/emericg/MiniVideo/ */
 void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
-                          BinaryReader &br) {
+                          BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();

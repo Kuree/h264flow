@@ -28,7 +28,7 @@ uint64_t intlog2(uint64_t x)
     return log;
 }
 
-uint8_t read_coeff_token(int nC, BinaryReader & br) {
+uint8_t read_coeff_token(int nC, BitReader & br) {
     /* adapted from https://goo.gl/pWSEqT */
     if (nC >= 8) {
         auto code = static_cast<uint32_t>(br.read_bits(6));
@@ -62,14 +62,14 @@ uint8_t read_coeff_token(int nC, BinaryReader & br) {
     throw std::runtime_error("coeff_token not found");
 }
 
-uint8_t read_ce_levelprefix(BinaryReader &br) {
+uint8_t read_ce_levelprefix(BitReader &br) {
     int leadingZeroBits = -1;
     for (int b = 0; !b; leadingZeroBits++)
         b = br.read_bit();
     return leadingZeroBits;
 }
 
-int code_from_bitstream_2d(BinaryReader &br,
+int code_from_bitstream_2d(BitReader &br,
                            const uint8_t *lentab, const uint8_t *codtab,
                            const int tabwidth, const int tabheight) {
     const uint8_t *len = &lentab[0];
@@ -95,7 +95,7 @@ int code_from_bitstream_2d(BinaryReader &br,
     throw std::runtime_error("unable to decode bit stream 2d");
 }
 
-int read_ce_totalzeros(BinaryReader &br, const int vlcnum,
+int read_ce_totalzeros(BitReader &br, const int vlcnum,
                        const int chromadc) {
     if (!chromadc)
         return code_from_bitstream_2d(br, &totalzeros_lentab[vlcnum][0],
@@ -107,7 +107,7 @@ int read_ce_totalzeros(BinaryReader &br, const int vlcnum,
                                        4, 1);
 }
 
-int read_ce_runbefore(BinaryReader &br, const int vlcnum) {
+int read_ce_runbefore(BitReader &br, const int vlcnum) {
     return code_from_bitstream_2d(br, &runbefore_lentab[vlcnum][0],
                                   &runbefore_codtab[vlcnum][0], 16, 1);
 }
