@@ -87,4 +87,8 @@ int MbPredChroma(uint64_t mb_type);
 
 bool is_p_slice(uint8_t first_byte);
 
+bool file_exists(const std::string &filename);
+
+std::string file_extension(const std::string &filename);
+
 #endif //H264FLOW_UTIL_HH

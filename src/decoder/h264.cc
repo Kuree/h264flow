@@ -15,18 +15,15 @@
  */
 
 #include <sstream>
-#include <experimental/filesystem>
 #include "h264.hh"
 #include "util.hh"
 #include "consts.hh"
 
 using std::shared_ptr;
 using std::runtime_error;
-namespace fs = std::experimental::filesystem;
 
 BitStream::BitStream(std::string filename) : _stream(), _chunk_offsets() {
-    fs::path p(filename.c_str());
-    if (!fs::exists(p))
+    if (!file_exists(filename))
         throw std::runtime_error(filename + " not found");
     _stream.open(filename);
 

@@ -15,21 +15,17 @@
  */
 
 #include "../src/decoder/h264.hh"
-#include <experimental/filesystem>
 #include <iomanip>
 
 using namespace std;
-namespace fs = std::experimental::filesystem;
 
 bool is_mp4(const char * filename) {
-    fs::path path(filename);
-    return path.extension().string() == ".mp4";
+    return file_extension(filename) == ".mp4";
 }
 
 bool is_raw(const char * filename) {
-    fs::path path(filename);
-    return path.extension().string() == ".264"
-           || path.extension().string() == ".h264";
+    return file_extension(filename) == ".264"
+           || file_extension(filename) == ".h264";
 }
 
 int main(int argc, char * argv[]) {

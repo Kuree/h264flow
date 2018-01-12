@@ -15,12 +15,11 @@
  */
 
 #include "mp4.hh"
+#include "util.hh"
 #include <sstream>
 #include <map>
-#include <experimental/filesystem>
 
 using std::string;
-namespace fs = std::experimental::filesystem;
 
 /* this holds for most cases. however, ideally it should be provided by
  * mp4 avc box.
@@ -109,8 +108,7 @@ std::set<std::shared_ptr<Box>> Box::find_all(std::string type) {
 
 MP4File::MP4File(std::string filename): _root(std::make_shared<Box>()),
                                         _stream() {
-    fs::path p(filename.c_str());
-    if (!fs::exists(p))
+    if (!file_exists(filename))
         throw std::runtime_error(filename + " not found");
     _stream.open(filename, std::ifstream::binary);
     BinaryReader br(_stream);
