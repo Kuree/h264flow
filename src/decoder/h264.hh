@@ -38,22 +38,29 @@ private:
 struct MotionVector {
     int mvL0[2] = {0, 0};
     int mvL1[2] = {0, 0};
+    uint32_t x = 0;
+    uint32_t y = 0;
+
+    inline double motion_distance_L0() const
+    { return std::sqrt(mvL0[0] * mvL0[0] + mvL0[1] * mvL0[1]); }
 };
 
 class MvFrame {
 public:
     explicit MvFrame(ParserContext &ctx);
-    MvFrame(uint32_t pic_width, uint32_t pic_height,uint32_t mb_width,
+    MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
             uint32_t mb_height);
     MotionVector get_mv(uint32_t mb_addr);
     MotionVector get_mv(uint32_t x, uint32_t y);
+    inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
+    { _mvs[y][x] = mv; }
     std::vector<std::vector<MotionVector>> get_all_mvs()
     { return  _mvs; }
 
-    uint32_t height() { return _height; }
-    uint32_t width() { return _width; }
-    uint32_t mb_height() { return _mb_height; }
-    uint32_t mb_width() { return _mb_width; }
+    inline uint32_t height() { return _height; }
+    inline uint32_t width() { return _width; }
+    inline uint32_t mb_height() { return _mb_height; }
+    inline uint32_t mb_width() { return _mb_width; }
 
 private:
     uint32_t _height = 0;

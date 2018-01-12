@@ -14,9 +14,9 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../src/decoder/h264.hh"
 #include <experimental/filesystem>
-#include <iomanip>
+#include "../src/decoder/h264.hh"
+#include "../src/query/operator.hh"
 
 using namespace std;
 namespace fs = std::experimental::filesystem;
@@ -32,13 +32,18 @@ bool is_raw(const char * filename) {
            || path.extension().string() == ".h264";
 }
 
-int main(int argc, char * argv[]) {
-    if (argc != 3) {
-        cerr << "Usage: " << argv[0] << " <file_name> <frame_number>" << endl;
-        return EXIT_FAILURE;
+int main(int argc, char *argv[]) {
+    if (argc != 8) {
+        cerr << "Usage: " << argv[0] << "<filename> <frame_num> <rect_x> "
+                "<rect_y> <rect_width> <rect_height> <threshold>" << endl;
     }
     char * filename = argv[1];
-    uint32_t frame_num = (uint32_t)stoi(argv[2]);
+    const uint32_t frame_num = (uint32_t)stoi(argv[2]);
+    const uint32_t rect_x = (uint32_t)stoi(argv[3]);
+    const uint32_t rect_y = (uint32_t)stoi(argv[4]);
+    const uint32_t width = (uint32_t)stoi(argv[5]);
+    const uint32_t height = (uint32_t)stoi(argv[6]);
+    const uint32_t threshold = (uint32_t)stoi(argv[7]);
     unique_ptr<h264> decoder = nullptr;
 
     if (is_mp4(filename)) {
@@ -51,32 +56,16 @@ int main(int argc, char * argv[]) {
         cerr << "Unsupported file format" << endl;
         return EXIT_FAILURE;
     }
-    try {
-        uint64_t index_size = decoder->index_size();
-        if (frame_num >= index_size) {
-            cerr << "frame: " << frame_num << " outside of range ("
-                 << index_size << ")" << endl;
-            return EXIT_FAILURE;
-        }
-        std::shared_ptr<MvFrame> frame = decoder->load_frame(frame_num);
-        if (!frame)
-            throw std::runtime_error("Not a P-slice");
-        cout << "Frame size: " << frame->width() << "x" << frame->height()
+
+    auto frame = decoder->load_frame(frame_num);
+    if (frame != nullptr) {
+        /* de-reference shared_ptr as the vector will be copied */
+        CropOperator crop(rect_x / 16, rect_y / 16, width / 16, height / 16,
+                          *frame.get());
+        ThresholdOperator thresh(threshold, crop);
+        thresh.execute();
+        cout << "Motion in selected region: " << (thresh.result() ? "true"
+                                                                 : "false")
              << endl;
-        uint32_t counter = 0;
-        for (uint32_t y = 0; y < frame->mb_height(); y++) {
-            for (uint32_t x = 0; x < frame->mb_width(); x++) {
-                auto mv = frame->get_mv(x, y);
-                cout << "x: " << setfill('0') << setw(2) << x << " y: "
-                     << setfill('0') << setw(2) << y << " mvL0: ("
-                     <<  mv.mvL0[0] << ", " << mv.mvL0[1] << ")";
-                if (counter++ % 3 == 2)
-                    cout << endl;
-                else
-                    cout << "    ";
-            }
-        }
-    } catch (const NotImplemented & ex) {
-        cerr << "ERROR " << ex.what() << endl;
     }
 }

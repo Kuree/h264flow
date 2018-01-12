@@ -14,7 +14,7 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../src/h264.hh"
+#include "../src/decoder/h264.hh"
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <experimental/filesystem>

@@ -426,7 +426,9 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
                     -mb->mvL[0][0][0][0] / 4,
                     -mb->mvL[0][0][0][1] / 4,
                     -mb->mvL[1][0][0][0] / 4,
-                    -mb->mvL[1][0][0][1] / 4
+                    -mb->mvL[1][0][0][1] / 4,
+                    mb->pos_x(),
+                    mb->pos_y(),
             };
             _mvs[i][j] = mv;
         }
