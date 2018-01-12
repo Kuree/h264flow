@@ -17,16 +17,32 @@
 #include "../src/h264.hh"
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include <experimental/filesystem>
 using namespace cv;
 using namespace std;
 
+namespace fs = std::experimental::filesystem;
+
+bool is_mp4(const char * filename) {
+    fs::path path(filename);
+    return path.extension().string() == ".mp4";
+}
+
+bool is_raw(const char * filename) {
+    fs::path path(filename);
+    return path.extension().string() == ".264"
+           || path.extension().string() == ".h264";
+}
+
 void draw_mv(shared_ptr<MvFrame> mvs, Mat & mat) {
+    if (!mvs) return;
     for (uint32_t y = 0; y < mvs->mb_height(); y++) {
         for (uint32_t x = 0; x < mvs->mb_width(); x++) {
             auto mv = mvs->get_mv(x, y);
-            Rect rect(x, y, 16, 16);
-            uint8_t color = uint8_t((abs(mv.mvL0[0]) + abs(mv.mvL0[1])) * 30);
-            rectangle(mat, rect, Scalar(color, color, color));
+            Rect rect(x * 16, y * 16, 16, 16);
+            uint8_t color = uint8_t((abs(mv.mvL0[0]) + abs(mv.mvL0[1])) * 10);
+            if (color > 0)
+                rectangle(mat, rect, Scalar(color, color, color), CV_FILLED);
         }
     }
 }
@@ -43,8 +59,18 @@ int main(int argc, char *argv[]) {
         throw runtime_error("error in opening " + filename);
 
     /* open decoder */
-    shared_ptr<BitStream> stream = make_shared<BitStream>(filename);
-    h264 decoder(stream);
+    unique_ptr<h264> decoder = nullptr;
+
+    if (is_mp4(filename.c_str())) {
+        shared_ptr<MP4File> mp4 = make_shared<MP4File>(filename);
+        decoder = make_unique<h264>(mp4);
+    } else if(is_raw(filename.c_str())) {
+        auto bs = make_shared<BitStream>(filename);
+        decoder = make_unique<h264>(bs);
+    } else {
+        cerr << "Unsupported file format" << endl;
+        return EXIT_FAILURE;
+    }
 
     namedWindow("video", 1);
     namedWindow("mv", 2);
@@ -54,16 +80,16 @@ int main(int argc, char *argv[]) {
         if (frame.empty())
             break;
         imshow("video", frame);
-        waitKey(20);
         shared_ptr<MvFrame> mvs;
         try {
-            /* TODO: fix this. 3 for SEI, SPS, and PPS */
-            mvs = decoder.load_frame(frame_counter + 3);
+            mvs = decoder->load_frame(frame_counter);
         } catch (NotImplemented & ex) {
             mvs = make_shared<MvFrame>(frame.cols, frame.rows, frame.cols / 16, frame.rows / 16);
         }
-        Mat mv_frame = Mat::zeros(mvs->height(), mvs->width(), CV_8UC3);
+        Mat mv_frame = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
         draw_mv(mvs, mv_frame);
+        imshow("mv", mv_frame);
+        waitKey(20);
     }
     return EXIT_SUCCESS;
 }

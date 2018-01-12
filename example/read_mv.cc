@@ -16,16 +16,17 @@
 
 #include "../src/h264.hh"
 #include <experimental/filesystem>
+#include <iomanip>
 
 using namespace std;
 namespace fs = std::experimental::filesystem;
 
-bool is_mp4(char * filename) {
+bool is_mp4(const char * filename) {
     fs::path path(filename);
     return path.extension().string() == ".mp4";
 }
 
-bool is_raw(char * filename) {
+bool is_raw(const char * filename) {
     fs::path path(filename);
     return path.extension().string() == ".264"
            || path.extension().string() == ".h264";
@@ -66,7 +67,8 @@ int main(int argc, char * argv[]) {
         for (uint32_t y = 0; y < frame->mb_height(); y++) {
             for (uint32_t x = 0; x < frame->mb_width(); x++) {
                 auto mv = frame->get_mv(x, y);
-                cout << "x: " << x << " y: " << y << " mvL0: ("
+                cout << "x: " << setfill('0') << setw(2) << x << " y: "
+                     << setfill('0') << setw(2) << y << " mvL0: ("
                      <<  mv.mvL0[0] << ", " << mv.mvL0[1] << ")";
                 if (counter++ % 3 == 2)
                     cout << endl;

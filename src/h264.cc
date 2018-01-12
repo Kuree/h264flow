@@ -294,7 +294,6 @@ void h264::process_inter_mb(ParserContext &ctx) {
                                          mb->mb_pred->mvd_l1[mbPartIdx][subMbPartIdx][1]);
                     }
                 }
-
                 mb->mvL[0][mbPartIdx][subMbPartIdx][0] = mvL0[0];
                 mb->mvL[0][mbPartIdx][subMbPartIdx][1] = mvL0[1];
                 mb->mvL[1][mbPartIdx][subMbPartIdx][0] = mvL1[1];
@@ -319,7 +318,9 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
     auto mbPartIdxB = ctx.mb->mbPartIdxB;
     auto mbPartIdxC = ctx.mb->mbPartIdxC;
 
-    if (mbAddrA == -1 || is_mb_intra(ctx.mb_array[mbAddrA]->mb_type) ||
+    uint64_t slice_type = ctx.header()->slice_type;
+
+    if (mbAddrA == -1 || is_mb_intra(ctx.mb_array[mbAddrA]->mb_type, slice_type) ||
             ctx.mb_array[mbAddrA]->predFlagL[listSuffixFlag][mbPartIdxA] == 0) {
         mvLA[0] = 0; mvLA[1] = 0;
         refIdxLA = -1;
@@ -329,7 +330,7 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
         refIdxLA = ctx.mb_array[mbAddrA]->refIdxL[listSuffixFlag][mbPartIdxA];
     }
 
-    if (mbAddrB == -1 || is_mb_intra(ctx.mb_array[mbAddrB]->mb_type) ||
+    if (mbAddrB == -1 || is_mb_intra(ctx.mb_array[mbAddrB]->mb_type, slice_type) ||
         ctx.mb_array[mbAddrB]->predFlagL[listSuffixFlag][mbPartIdxB] == 0) {
         mvLB[0] = 0; mvLB[1] = 0;
         refIdxLB = -1;
@@ -339,7 +340,7 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
         refIdxLB = ctx.mb_array[mbAddrB]->refIdxL[listSuffixFlag][mbPartIdxB];
     }
 
-    if (mbAddrC == -1 || is_mb_intra(ctx.mb_array[mbAddrC]->mb_type) ||
+    if (mbAddrC == -1 || is_mb_intra(ctx.mb_array[mbAddrC]->mb_type, slice_type) ||
         ctx.mb_array[mbAddrC]->predFlagL[listSuffixFlag][mbPartIdxC] == 0) {
         mvLC[0] = 0; mvLC[1] = 0;
         refIdxLC = -1;
@@ -422,10 +423,10 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             if (mb->pos_x() != j || mb->pos_y() != i)
                 throw std::runtime_error("pos does not match");
             MotionVector mv {
-                    mb->mvL[0][0][0][0],
-                    mb->mvL[0][0][0][1],
-                    mb->mvL[1][0][0][0],
-                    mb->mvL[1][0][0][1]
+                    -mb->mvL[0][0][0][0] / 4,
+                    -mb->mvL[0][0][0][1] / 4,
+                    -mb->mvL[1][0][0][0] / 4,
+                    -mb->mvL[1][0][0][1] / 4
             };
             _mvs[i][j] = mv;
         }

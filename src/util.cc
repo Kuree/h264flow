@@ -119,10 +119,10 @@ void read_rbsp_trailing_bits(BinaryReader &br) {
     br.reset_bit(true);
 }
 
-bool is_mb_intra(uint64_t mb_type) {
-    return mb_type == Intra_4x4 || mb_type == Intra_16x16;
+bool is_mb_intra(uint64_t mb_type, uint64_t slice_type) {
+    int type = MbPartPredMode(mb_type, 0, slice_type);
+    return (type == Intra_4x4 || type == Intra_16x16);
 }
-
 
 uint64_t NumSubMbPart(uint64_t sub_mb_type, uint64_t slice_type) {
     /* TODO: might not be true */

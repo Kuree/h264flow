@@ -61,7 +61,7 @@ inline int InverseRasterScan_y(const int a, const int b, const int c,
     return (a / (d / b)) * c;
 }
 
-bool is_mb_intra(uint64_t mb_type);
+bool is_mb_intra(uint64_t mb_type, uint64_t slice_type);
 
 template<typename T> T median(T * array, uint32_t num_elem) {
     std::vector<T> v(array, array + num_elem);
