@@ -1,5 +1,8 @@
 set(PYBIND11_CPP_STANDARD -std=c++14)
 find_package(pybind11)
+if (!pybind11_FOUND)
+    add_subdirectory(pybind11)
+endif ()
 if (pybind11_FOUND)
     pybind11_add_module(h264flow h264flow.cc)
     target_link_libraries(h264flow pybind11::module)
