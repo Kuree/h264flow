@@ -21,5 +21,12 @@ namespace py = pybind11;
 
 
 void init_h264(py::module &m) {
-    py::class_<h264>(m, "h264").def(py::init<const std::string &>());
+    py::class_<h264>(m, "h264").def(py::init<const std::string &>())
+        .def("load_frame", &h264::load_frame)
+        .def("index_size", &h264::index_size)
+        .def("index_nal", &h264::index_nal);
+}
+
+void init_mv_frame(py::module &m) {
+    py::class_<MvFrame>(m, "h264");
 }
