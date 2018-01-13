@@ -15,17 +15,15 @@
  */
 
 #include "../src/decoder/h264.hh"
-#include <iostream>
 #include <opencv2/opencv.hpp>
 
 using namespace cv;
 using namespace std;
 
-void draw_mv(shared_ptr<MvFrame> mvs, Mat & mat) {
-    if (!mvs) return;
-    for (uint32_t y = 0; y < mvs->mb_height(); y++) {
-        for (uint32_t x = 0; x < mvs->mb_width(); x++) {
-            auto mv = mvs->get_mv(x, y);
+void draw_mv(MvFrame &mvs, Mat & mat) {
+    for (uint32_t y = 0; y < mvs.mb_height(); y++) {
+        for (uint32_t x = 0; x < mvs.mb_width(); x++) {
+            auto mv = mvs.get_mv(x, y);
             Rect rect(x * 16, y * 16, 16, 16);
             uint8_t color = uint8_t((abs(mv.mvL0[0]) + abs(mv.mvL0[1])) * 10);
             if (color > 0)
@@ -56,12 +54,7 @@ int main(int argc, char *argv[]) {
         if (frame.empty())
             break;
         imshow("video", frame);
-        shared_ptr<MvFrame> mvs;
-        try {
-            mvs = decoder->load_frame(frame_counter);
-        } catch (NotImplemented & ex) {
-            mvs = make_shared<MvFrame>(frame.cols, frame.rows, frame.cols / 16, frame.rows / 16);
-        }
+        MvFrame mvs = decoder->load_frame(frame_counter);
         Mat mv_frame = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
         draw_mv(mvs, mv_frame);
         imshow("mv", mv_frame);

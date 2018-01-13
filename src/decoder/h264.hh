@@ -36,6 +36,7 @@ private:
 };
 
 struct MotionVector {
+    /* packed together. assume their memory is continuous */
     int mvL0[2] = {0, 0};
     int mvL1[2] = {0, 0};
     uint32_t x = 0;
@@ -43,16 +44,6 @@ struct MotionVector {
 
     inline double motion_distance_L0() const
     { return std::sqrt(mvL0[0] * mvL0[0] + mvL0[1] * mvL0[1]); }
-    MotionVector create_mv(int * mvL0, int * mvL1, uint32_t x, uint32_t y) {
-        return MotionVector {
-                mvL0[0],
-                mvL0[1],
-                mvL0[1],
-                mvL1[1],
-                x,
-                y
-        };
-    }
 };
 
 class MvFrame {
@@ -64,13 +55,13 @@ public:
     MotionVector get_mv(uint32_t x, uint32_t y);
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
     { _mvs[y][x] = mv; }
-    std::vector<std::vector<MotionVector>> get_all_mvs()
-    { return  _mvs; }
 
-    inline uint32_t height() { return _height; }
-    inline uint32_t width() { return _width; }
-    inline uint32_t mb_height() { return _mb_height; }
-    inline uint32_t mb_width() { return _mb_width; }
+    inline uint32_t height() const { return _height; }
+    inline uint32_t width() const { return _width; }
+    inline uint32_t mb_height() const { return _mb_height; }
+    inline uint32_t mb_width() const { return _mb_width; }
+
+    inline std::vector<MotionVector>operator[](uint32_t y) { return _mvs[y]; }
 
 private:
     uint32_t _height = 0;
@@ -87,7 +78,7 @@ public:
     explicit h264(std::shared_ptr<BitStream> stream);
 
     void index_nal();
-    std::shared_ptr<MvFrame> load_frame(uint64_t frame_num);
+    MvFrame load_frame(uint64_t frame_num);
     uint64_t index_size();
 private:
     uint8_t _length_size = 4;
@@ -111,8 +102,6 @@ private:
 
     void process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx,
                          int listSuffixFlag, int (&mvL)[2]);
-
-    std::shared_ptr<MvFrame> produce_mv(ParserContext & ctx);
 
     void load_bitstream();
     void load_mp4();

@@ -186,7 +186,7 @@ uint64_t h264::index_size() {
     }
 }
 
-std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
+MvFrame h264::load_frame(uint64_t frame_num) {
     std::string nal_data;
     if (_bit_stream) {
         uint64_t pos, size;
@@ -203,15 +203,15 @@ std::shared_ptr<MvFrame> h264::load_frame(uint64_t frame_num) {
         nal_data = _mp4->extract_stream(offset + _length_size,
                                                     unit_size);
     }
+    ParserContext ctx(_sps, _pps);
     /* test the slice type */
     if (!is_p_slice(nal_data[0]))
-        return nullptr;
-    ParserContext ctx(_sps, _pps);
+        return MvFrame(ctx.Width(), ctx.Height(), 16, 16);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
 
     process_inter_mb(ctx);
-    return produce_mv(ctx);
+    return MvFrame(ctx);
 }
 
 /* adapted from py264 */
@@ -420,10 +420,6 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
             mvL[1] = median<int>(L1, 3);
         }
     }
-}
-
-std::shared_ptr<MvFrame> h264::produce_mv(ParserContext &ctx) {
-    return std::make_shared<MvFrame>(ctx);
 }
 
 MvFrame::MvFrame(ParserContext &ctx) : _mvs() {

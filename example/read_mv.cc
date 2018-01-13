@@ -35,15 +35,13 @@ int main(int argc, char * argv[]) {
                  << index_size << ")" << endl;
             return EXIT_FAILURE;
         }
-        std::shared_ptr<MvFrame> frame = decoder->load_frame(frame_num);
-        if (!frame)
-            throw std::runtime_error("Not a P-slice");
-        cout << "Frame size: " << frame->width() << "x" << frame->height()
+        MvFrame frame = decoder->load_frame(frame_num);
+        cout << "Frame size: " << frame.width() << "x" << frame.height()
              << endl;
         uint32_t counter = 0;
-        for (uint32_t y = 0; y < frame->mb_height(); y++) {
-            for (uint32_t x = 0; x < frame->mb_width(); x++) {
-                auto mv = frame->get_mv(x, y);
+        for (uint32_t y = 0; y < frame.mb_height(); y++) {
+            for (uint32_t x = 0; x < frame.mb_width(); x++) {
+                auto mv = frame.get_mv(x, y);
                 cout << "x: " << setfill('0') << setw(2) << x << " y: "
                      << setfill('0') << setw(2) << y << " mvL0: ("
                      <<  mv.mvL0[0] << ", " << mv.mvL0[1] << ")";

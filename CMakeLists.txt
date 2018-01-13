@@ -4,6 +4,8 @@ project(h264flow)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-pedantic -Wall -Wextra -Weffc++ -Werror -fPIC")
 
+add_subdirectory(python/pybind11)
+
 add_subdirectory(src)
 add_subdirectory(example)
 add_subdirectory(python)

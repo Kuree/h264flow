@@ -1,14 +1,9 @@
 set(PYBIND11_CPP_STANDARD -std=c++14)
-find_package(pybind11)
-if (!pybind11_FOUND)
-    add_subdirectory(pybind11)
-endif ()
-if (pybind11_FOUND)
-    pybind11_add_module(h264flow h264flow.cc)
-    target_link_libraries(h264flow pybind11::module)
-    target_link_libraries(h264flow h264)
-    set_target_properties(h264flow PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}"
+pybind11_add_module(h264flow h264flow.cc)
+target_link_libraries(h264flow PRIVATE pybind11::module)
+target_link_libraries(h264flow PRIVATE h264)
+set_target_properties(h264flow PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}"
         SUFFIX "${PYTHON_MODULE_EXTENSION}")
-else()
-    MESSAGE("pybind11 not found")
-endif()
+
+set_source_files_properties(h264flow.cc PROPERTIES COMPILE_FLAGS
+        "-Wno-effc++ -Wno-deprecated-declarations")
