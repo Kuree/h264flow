@@ -15,7 +15,7 @@
  */
 
 #include <pybind11/pybind11.h>
-#include "../decoder/h264.hh"
+#include "../src/decoder/h264.hh"
 
 namespace py = pybind11;
 
@@ -28,5 +28,22 @@ void init_h264(py::module &m) {
 }
 
 void init_mv_frame(py::module &m) {
-    py::class_<MvFrame>(m, "h264");
+    py::class_<MvFrame>(m, "MvFrame").def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
+            .def("get_mv", (MotionVector (MvFrame::*)(uint32_t, uint32_t))&MvFrame::get_mv)
+            .def("get_mv", (MotionVector (MvFrame::*)(uint32_t))&MvFrame::get_mv)
+            .def("width", &MvFrame::width)
+            .def("height", &MvFrame::height);
+}
+
+void init_mv(py::module &m) {
+    py::class_<MotionVector>(m, "MotionVector").def("create_mv", &MotionVector::create_mv)
+            .def("motion_distance_L0", &MotionVector::motion_distance_L0);
+}
+
+PYBIND11_PLUGIN(h264flow) {
+    py::module m("h264flow", "h264flow python binding");
+    init_h264(m);
+    init_mv_frame(m);
+    init_mv(m);
+    return m.ptr();
 }

@@ -43,6 +43,16 @@ struct MotionVector {
 
     inline double motion_distance_L0() const
     { return std::sqrt(mvL0[0] * mvL0[0] + mvL0[1] * mvL0[1]); }
+    MotionVector create_mv(int * mvL0, int * mvL1, uint32_t x, uint32_t y) {
+        return MotionVector {
+                mvL0[0],
+                mvL0[1],
+                mvL0[1],
+                mvL1[1],
+                x,
+                y
+        };
+    }
 };
 
 class MvFrame {

@@ -52,3 +52,9 @@ CTestTestfile.cmake
 .idea
 cmake-build-debug/
 build
+*.mp4
+*.264
+*.h264
+
+# Python
+env
