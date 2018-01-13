@@ -206,7 +206,7 @@ MvFrame h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(_sps, _pps);
     /* test the slice type */
     if (!is_p_slice(nal_data[0]))
-        return MvFrame(ctx.Width(), ctx.Height(), 16, 16);
+        return MvFrame(ctx.Width(), ctx.Height(), 16, 16, false);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
 
@@ -450,9 +450,9 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
 }
 
 MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
-                 uint32_t mb_height) : _height(pic_height), _width(pic_width),
-                                       _mb_width(mb_width),
-                                       _mb_height(mb_height), _mvs() {
+                 uint32_t mb_height, bool p_frame)
+        : _height(pic_height), _width(pic_width), _mb_width(mb_width),
+          _mb_height(mb_height), _mvs(), _p_frame(p_frame) {
     _mvs = std::vector<std::vector<MotionVector>>(_height,
                                                   std::vector<MotionVector>(_width));
 }

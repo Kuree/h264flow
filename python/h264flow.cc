@@ -32,7 +32,19 @@ void init_mv_frame(py::module &m) {
     py::class_<MvFrame>(m, "MvFrame").def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
             .def("get_mv", (MotionVector (MvFrame::*)(uint32_t, uint32_t))&MvFrame::get_mv)
             .def("width", &MvFrame::width)
-            .def("height", &MvFrame::height);
+            .def("height", &MvFrame::height)
+            .def_property_readonly("mvL0", [](MvFrame &mv) {
+                auto lst = py::list();
+                for (uint32_t i = 0; i < mv.height(); i++) {
+                    auto row = mv.get_row(i);
+                    auto row_list = py::list();
+                    for (uint32_t j = 0; j < row.size(); j++)
+                        row_list.append(py::array(2, row[j].mvL0));
+                    lst.append(row_list);
+                }
+                return py::array(lst);
+            })
+            .def_property_readonly("p_frame", [](MvFrame &mv) { return mv.p_frame(); });
 }
 
 void init_mv(py::module &m) {

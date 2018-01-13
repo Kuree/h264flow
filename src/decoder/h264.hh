@@ -50,11 +50,13 @@ class MvFrame {
 public:
     explicit MvFrame(ParserContext &ctx);
     MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
-            uint32_t mb_height);
+            uint32_t mb_height, bool p_frame = false);
     MotionVector get_mv(uint32_t mb_addr);
     MotionVector get_mv(uint32_t x, uint32_t y);
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
     { _mvs[y][x] = mv; }
+    inline std::vector<MotionVector> get_row(uint32_t row)
+    { return _mvs[row]; }
 
     inline uint32_t height() const { return _height; }
     inline uint32_t width() const { return _width; }
@@ -63,12 +65,15 @@ public:
 
     inline std::vector<MotionVector>operator[](uint32_t y) { return _mvs[y]; }
 
+    inline bool p_frame() { return _p_frame; }
+
 private:
     uint32_t _height = 0;
     uint32_t _width = 0;
     uint32_t _mb_width = 0;
     uint32_t _mb_height = 0;
     std::vector<std::vector<MotionVector>> _mvs;
+    bool _p_frame = true;
 };
 
 class h264 {
