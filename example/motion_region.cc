@@ -34,6 +34,10 @@ int main(int argc, char *argv[]) {
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
     auto frame = decoder->load_frame(frame_num);
+    /* check if the indicated region is within the frame */
+    if (rect_y + height > frame.height() || rect_x + width > frame.width())
+        throw std::runtime_error("rectangle is outside the range");
+
     /* de-reference shared_ptr as the vector will be copied */
     CropOperator crop(rect_x / 16, rect_y / 16, width / 16, height / 16,
                       frame);

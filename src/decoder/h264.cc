@@ -206,7 +206,7 @@ MvFrame h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(_sps, _pps);
     /* test the slice type */
     if (!is_p_slice(nal_data[0]))
-        return MvFrame(ctx.Width(), ctx.Height(), 16, 16, false);
+        return MvFrame(ctx.Width() / 16, ctx.Height() / 16, 16, 16, false);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
 
@@ -425,10 +425,10 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
 MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
     _height = ctx.Height();
     _width = ctx.Width();
-    _mvs = std::vector<std::vector<MotionVector>>(_height,
-                                                  std::vector<MotionVector>(_width));
     _mb_width = (uint32_t)ctx.PicWidthInMbs();
     _mb_height = (uint32_t)ctx.PicHeightInMapUnits();
+    _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
+                                                  std::vector<MotionVector>(_mb_width));
     for (uint32_t i = 0; i < _mb_height; i++) {
         for (uint32_t j = 0; j < _mb_width; j++) {
             /* compute mb_addr */
