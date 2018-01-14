@@ -35,7 +35,7 @@ void init_mv_frame(py::module &m) {
             .def("height", &MvFrame::height)
             .def_property_readonly("mvL0", [](MvFrame &mv) {
                 auto lst = py::list();
-                for (uint32_t i = 0; i < mv.height(); i++) {
+                for (uint32_t i = 0; i < mv.height() / 16; i++) {
                     auto row = mv.get_row(i);
                     auto row_list = py::list();
                     for (uint32_t j = 0; j < row.size(); j++)
