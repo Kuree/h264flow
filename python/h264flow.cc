@@ -17,6 +17,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "../src/decoder/h264.hh"
+#include "../src/query/operator.hh"
 
 namespace py = pybind11;
 
@@ -57,10 +58,28 @@ void init_mv(py::module &m) {
             .def_readwrite("y", &MotionVector::y);
 }
 
+void init_op(py::module &m) {
+    py::class_<Operator>(m, "Operator").def(py::init<Operator&>())
+            .def(py::init<MvFrame>())
+            .def("execute", &Operator::execute)
+            .def("get_frame", &Operator::get_frame);
+    py::class_<ThresholdOperator>(m, "ThresholdOperator")
+            .def(py::init<uint32_t, Operator&>())
+            .def(py::init<uint32_t, CropOperator&>())
+            .def(py::init<uint32_t, MvFrame>())
+            .def("execute", &ThresholdOperator::execute)
+            .def("result", &ThresholdOperator::result);
+    py::class_<CropOperator>(m, "CropOperator")
+            .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, Operator&>())
+            .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, MvFrame>())
+            .def("execute", &ReduceOperator::execute);
+}
+
 PYBIND11_PLUGIN(h264flow) {
     py::module m("h264flow", "h264flow python binding");
     init_h264(m);
     init_mv_frame(m);
     init_mv(m);
+    init_op(m);
     return m.ptr();
 }

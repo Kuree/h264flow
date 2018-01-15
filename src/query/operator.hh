@@ -26,6 +26,8 @@ public:
     explicit Operator(MvFrame frame) : _frame(std::move(frame)) {}
     virtual void execute() { _has_executed = true; };
     virtual ~Operator() = default;
+    bool has_executed() const { return _has_executed; }
+    MvFrame get_frame() const { return _frame; }
 
 protected:
     MvFrame _frame;
@@ -35,9 +37,8 @@ protected:
 class BooleanOperator : public Operator {
 public:
     explicit BooleanOperator(Operator & op) : Operator(op)
-    { if (!_has_executed) { op.execute(); _has_executed = true; } }
+    { if (!op.has_executed()) { op.execute(); } }
     explicit BooleanOperator(MvFrame frame) : Operator(std::move(frame)) {}
-    void execute() override { Operator::execute(); }
 
     virtual bool result () { return false; }
 };
@@ -45,7 +46,7 @@ public:
 class ReduceOperator : public Operator {
 public:
     explicit ReduceOperator(Operator & op) : Operator(op)
-    { if (!_has_executed) { op.execute(); _has_executed = true; } }
+    { if (!op.has_executed()) { op.execute(); } }
     explicit ReduceOperator(MvFrame frame) : Operator(std::move(frame)) {}
     void execute() final
     { if (!_has_executed) { reduce(); _has_executed = true; } }
@@ -58,7 +59,8 @@ class ThresholdOperator : public BooleanOperator {
 public:
     ThresholdOperator(uint32_t threshold, Operator &op)
             : BooleanOperator(op), _threshold(threshold) {}
-
+    ThresholdOperator(uint32_t threshold, MvFrame frame)
+            : BooleanOperator(frame), _threshold(threshold) {}
     bool result() override { return _result; }
     void execute() override;
 private:

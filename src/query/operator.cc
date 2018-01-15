@@ -18,8 +18,8 @@
 
 void ThresholdOperator::execute() {
     BooleanOperator::execute();
-    for (uint32_t y = 0; y < _frame.height(); y++) {
-        for (uint32_t x = 0; x < _frame.width(); x++) {
+    for (uint32_t y = 0; y < _frame.mb_height(); y++) {
+        for (uint32_t x = 0; x < _frame.mb_width(); x++) {
             auto mv = _frame.get_mv(x, y);
             if (mv.motion_distance_L0() > _threshold) {
                 _result = true;

@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
     if (argc != 8) {
         cerr << "Usage: " << argv[0] << "<filename> <frame_num> <rect_x> "
                 "<rect_y> <rect_width> <rect_height> <threshold>" << endl;
+        return EXIT_FAILURE;
     }
     char *filename = argv[1];
     const uint32_t frame_num = (uint32_t) stoi(argv[2]);
