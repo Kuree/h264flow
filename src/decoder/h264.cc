@@ -270,7 +270,7 @@ void h264::process_inter_mb(ParserContext &ctx) {
                         process_luma_mv(ctx, mbPartIdx, mvL0A, mvL0B, mvL0C,
                                         refIdxLA, refIdxLB, refIdxLC, mvL0);
                     }
-
+                    refIdxL0 = 0;
                     predFlagL0 = true;
                     predFlagL1 = false;
                 } else {
@@ -410,9 +410,6 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
         } else if (refIdxLA == -1 and refIdxLB == -1 and refIdxLC != -1) {
             mvL[0] = mvLC[0];
             mvL[1] = mvLC[1];
-        } else if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
-            mvL[0] = 0;
-            mvL[1] = 0;
         } else {
             int L0[3] = {mvLA[0], mvLB[0], mvLC[0]};
             int L1[3] = {mvLA[1], mvLB[1], mvLC[1]};
