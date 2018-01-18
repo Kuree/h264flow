@@ -17,8 +17,13 @@
 #ifndef H264FLOW_OPERATOR_HH
 #define H264FLOW_OPERATOR_HH
 
+#include <set>
 #include "../decoder/h264.hh"
 
+
+/* TODO:
+ * We need to redesign how Operators works
+ */
 
 class Operator {
 public:
@@ -85,4 +90,23 @@ private:
     uint32_t _x, _y, _width, _height;
 };
 
+
+MvFrame median_filter(MvFrame &frame, uint32_t size);
+MvFrame horizontal_filter(MvFrame &frame);
+MvFrame vertical_filter(MvFrame &frame);
+
+
+/* TODO: consider refactoring */
+struct MvPoint {
+    uint32_t x = 0;
+    uint32_t y = 0;
+};
+
+bool operator<(const MvPoint &p1, const MvPoint &p2);
+
+std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
+                                      uint32_t col_start, uint32_t width,
+                                      uint32_t height, uint32_t bins);
+
+std::vector<std::set<MvPoint>> mv_partition(MvFrame &frame, double threshold);
 #endif //H264FLOW_OPERATOR_HH

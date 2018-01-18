@@ -15,13 +15,14 @@
  */
 
 #include <algorithm>
-#include "../src/decoder/h264.hh"
 #include <opencv2/opencv.hpp>
+#include "../src/query/operator.hh"
+#include "../src/decoder/h264.hh"
 
 using namespace cv;
 using namespace std;
 
-void draw_mv(MvFrame &mvs, Mat & mat) {
+void draw_mv(MvFrame &mvs, Mat &mat) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
@@ -32,8 +33,8 @@ void draw_mv(MvFrame &mvs, Mat & mat) {
             uint32_t start_y = y * 16 + 8;
             double norm = sqrt(mv_x * mv_x + mv_y + mv_y);
             if (norm > 0) {
-                auto red = (uint8_t)((norm / 25.0 * 255) < 255 ?
-                                     (norm / 25.0 * 255) : 255);
+                auto red = (uint8_t) ((norm / 25.0 * 255) < 255 ?
+                                      (norm / 25.0 * 255) : 255);
                 /* draw the vector */
                 arrowedLine(mat, Point(start_x, start_y),
                             Point(start_x + mv_x, start_y + mv_y),
@@ -43,6 +44,18 @@ void draw_mv(MvFrame &mvs, Mat & mat) {
                 circle(mat, Point(start_x, start_y), 1, Scalar(128, 128, 128),
                        CV_FILLED);
             }
+        }
+    }
+
+
+    /* draw the motion region */
+    std::vector<std::set<MvPoint>> regions = mv_partition(mvs, 5);
+    for (const auto &s : regions) {
+        for (const auto &p : s) {
+            Mat roi = mat(Rect(p.x * 16, p.y * 16, 16, 16));
+            cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
+            float alpha = 0.3;
+            addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);
         }
     }
 }
@@ -63,11 +76,13 @@ int main(int argc, char *argv[]) {
 
     namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
-    for (; ; frame_counter++) {
+    for (; frame_counter < decoder->index_size(); frame_counter++) {
         capture >> frame;
         if (frame.empty())
             break;
         MvFrame mvs = decoder->load_frame(frame_counter);
+        /* median filter */
+        //mvs = median_filter(mvs, 3);
         draw_mv(mvs, frame);
         imshow("video", frame);
         waitKey(10);
