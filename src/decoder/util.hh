@@ -63,13 +63,6 @@ inline int InverseRasterScan_y(const int a, const int b, const int c,
 
 bool is_mb_intra(uint64_t mb_type, uint64_t slice_type);
 
-template<typename T> T median(T * array, uint32_t num_elem) {
-    std::vector<T> v(array, array + num_elem);
-    uint32_t n = num_elem / 2;
-    std::nth_element(v.begin(), v.begin() + n, v.end());
-    return v[n];
-}
-
 uint64_t NumSubMbPart(uint64_t sub_mb_type, uint64_t slice_type);
 
 uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type);

@@ -411,10 +411,10 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
             mvL[0] = mvLC[0];
             mvL[1] = mvLC[1];
         } else {
-            int L0[3] = {mvLA[0], mvLB[0], mvLC[0]};
-            int L1[3] = {mvLA[1], mvLB[1], mvLC[1]};
-            mvL[0] = median<int>(L0, 3);
-            mvL[1] = median<int>(L1, 3);
+            mvL[0] = std::max(std::min(mvLA[0], mvLB[0]),
+                              std::min(std::max(mvLA[0], mvLB[0]), mvLC[0]));
+            mvL[1] = std::max(std::min(mvLA[1], mvLB[1]),
+                              std::min(std::max(mvLA[1], mvLB[1]), mvLC[1]));
         }
     }
 }
@@ -436,8 +436,6 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             MotionVector mv {
                     -mb->mvL[0][0][0][0] / 4,
                     -mb->mvL[0][0][0][1] / 4,
-                    -mb->mvL[1][0][0][0] / 4,
-                    -mb->mvL[1][0][0][1] / 4,
                     mb->pos_x(),
                     mb->pos_y(),
             };

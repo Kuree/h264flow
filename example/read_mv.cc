@@ -15,6 +15,7 @@
  */
 
 #include "../src/decoder/h264.hh"
+#include "../src/decoder/util.hh"
 #include <iomanip>
 
 using namespace std;

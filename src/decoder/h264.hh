@@ -18,7 +18,6 @@
 #define H264FLOW_H264_HH
 
 #include "mp4.hh"
-#include "util.hh"
 
 class BitStream {
 public:
@@ -36,9 +35,7 @@ private:
 };
 
 struct MotionVector {
-    /* packed together. assume their memory is continuous */
     int mvL0[2] = {0, 0};
-    int mvL1[2] = {0, 0};
     uint32_t x = 0;
     uint32_t y = 0;
 

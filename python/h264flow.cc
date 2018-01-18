@@ -52,7 +52,6 @@ void init_mv(py::module &m) {
     py::class_<MotionVector>(m, "MotionVector")
             .def("motion_distance_L0", &MotionVector::motion_distance_L0)
             .def_property_readonly("mvL0", [](MotionVector &mv) { return py::array(2, mv.mvL0);})
-            .def_property_readonly("mvL1", [](MotionVector &mv) { return py::array(2, mv.mvL1);})
             //.def_property_readonly("mvL1", [](const MotionVector& mv) { return &mv.mvL1; })
             .def_readwrite("x", &MotionVector::x)
             .def_readwrite("y", &MotionVector::y);
