@@ -95,18 +95,23 @@ MvFrame median_filter(MvFrame &frame, uint32_t size);
 MvFrame horizontal_filter(MvFrame &frame);
 MvFrame vertical_filter(MvFrame &frame);
 
-
-/* TODO: consider refactoring */
-struct MvPoint {
-    uint32_t x = 0;
-    uint32_t y = 0;
-};
-
-bool operator<(const MvPoint &p1, const MvPoint &p2);
+bool operator<(const MotionVector &p1, const MotionVector &p2);
 
 std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
                                       uint32_t col_start, uint32_t width,
                                       uint32_t height, uint32_t bins);
 
-std::vector<std::set<MvPoint>> mv_partition(MvFrame &frame, double threshold);
+std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
+                                                 double threshold);
+
+
+enum MotionType {
+    NoMotion = 0,
+    Translation = 1,
+    Rotation = 1 << 1,
+    ZoomIn = 1 << 2,
+    ZoomOut = 1 << 3
+};
+
+MotionType CategorizeMotion();
 #endif //H264FLOW_OPERATOR_HH

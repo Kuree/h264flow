@@ -138,45 +138,42 @@ std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
 }
 
 
-bool operator<(const MvPoint &p1, const MvPoint &p2) {
+bool operator<(const MotionVector &p1, const MotionVector &p2) {
     return p1.x < p2.x or p1.y < p2.y;
 }
 
-void add_points(std::vector<bool> & visited, std::set<MvPoint> & result,
-                uint32_t index, uint32_t width, uint32_t height) {
+void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
+                MvFrame &frame, uint32_t index, uint32_t width,
+                uint32_t height) {
     if (visited[index]) return;
-    uint32_t x = index % width;
-    uint32_t y = index / width;
-    MvPoint p {
-            x, y
-    };
-    result.insert(p);
+    result.insert(frame.get_mv(index));
     visited[index] = true;
 
     /* search for its neighbors */
     if (index > width) {
         /* up */
-        add_points(visited, result, index - width, width, height);
+        add_points(visited, result, frame, index - width, width, height);
     }
     if (index % width) {
         /* left */
-        add_points(visited, result, index - 1, width, height);
+        add_points(visited, result, frame, index - 1, width, height);
     }
     if ((index + 1) % width != 0) {
         /* right */
-        add_points(visited, result, index + 1, width, height);
+        add_points(visited, result, frame, index + 1, width, height);
     }
     if ((index / width < height - 1)) {
         /* down */
-        add_points(visited, result, index + width, width, height);
+        add_points(visited, result, frame, index + width, width, height);
     }
 }
 
-std::vector<std::set<MvPoint>> mv_partition(MvFrame &frame, double threshold) {
+std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
+                                                 double threshold) {
     std::vector<bool> visited = std::vector<bool>(frame.mb_height() *
                                                           frame.mb_width(),
                                               true);
-    std::vector<std::set<MvPoint>> result;
+    std::vector<std::set<MotionVector>> result;
     for (uint32_t i = 0; i < visited.size(); i++) {
         MotionVector mv = frame.get_mv(i);
         int x = mv.mvL0[0];
@@ -197,8 +194,9 @@ std::vector<std::set<MvPoint>> mv_partition(MvFrame &frame, double threshold) {
 
         if (!found)
             break; /* terminate search */
-        std::set<MvPoint> s;
-        add_points(visited, s, index, frame.mb_width(), frame.mb_height());
+        std::set<MotionVector> s;
+        add_points(visited, s, frame, index, frame.mb_width(),
+                   frame.mb_height());
         if (s.size() > 1)
             result.emplace_back(s);
         index++;

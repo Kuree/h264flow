@@ -49,10 +49,10 @@ void draw_mv(MvFrame &mvs, Mat &mat) {
 
 
     /* draw the motion region */
-    std::vector<std::set<MvPoint>> regions = mv_partition(mvs, 5);
+    std::vector<std::set<MotionVector>> regions = mv_partition(mvs, 5);
     for (const auto &s : regions) {
         for (const auto &p : s) {
-            Mat roi = mat(Rect(p.x * 16, p.y * 16, 16, 16));
+            Mat roi = mat(Rect(p.x, p.y, 16, 16));
             cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
             float alpha = 0.3;
             addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);

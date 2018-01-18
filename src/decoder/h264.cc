@@ -436,8 +436,8 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             MotionVector mv {
                     -mb->mvL[0][0][0][0] / 4,
                     -mb->mvL[0][0][0][1] / 4,
-                    mb->pos_x(),
-                    mb->pos_y(),
+                    mb->pos_x() * 16,
+                    mb->pos_y() * 16,
             };
             _mvs[i][j] = mv;
         }
