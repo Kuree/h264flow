@@ -15,7 +15,11 @@
  */
 
 #include <algorithm>
-#include <math.h>
+#include <cmath>
+#include <map>
+#include <numeric>
+#include <iterator>
+#include <set>
 #include "operator.hh"
 
 void ThresholdOperator::execute() {
@@ -23,7 +27,7 @@ void ThresholdOperator::execute() {
     for (uint32_t y = 0; y < _frame.mb_height(); y++) {
         for (uint32_t x = 0; x < _frame.mb_width(); x++) {
             auto mv = _frame.get_mv(x, y);
-            if (mv.motion_distance_L0() > _threshold) {
+            if (mv.energy > _threshold) {
                 _result = true;
                 return;
             }
@@ -176,9 +180,7 @@ std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
     std::vector<std::set<MotionVector>> result;
     for (uint32_t i = 0; i < visited.size(); i++) {
         MotionVector mv = frame.get_mv(i);
-        int x = mv.mvL0[0];
-        int y = mv.mvL0[1];
-        if (x * x + y * y > threshold)
+        if (mv.energy > threshold)
             visited[i] = false;
     }
     uint32_t index = 0;
@@ -202,4 +204,108 @@ std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
         index++;
     }
     return result;
+}
+
+std::map<MotionType, bool> CategorizeCameraMotion(MvFrame &frame, double threshold,
+                                  double fraction) {
+    return CategorizeCameraMotion(frame, mv_partition(frame, threshold), fraction);
+}
+
+std::map<MotionType, bool> CategorizeCameraMotion(
+        MvFrame &frame, std::vector<std::set<MotionVector>> motion_regions,
+        double fraction) {
+    /*
+     * Naive approach:
+     * Assumptions:
+     * 1. If a camera is moving, the majority (defined by fraction) of the
+     * motion vectors should be connected to each other (defined by threshold).
+     * 2. If it is a camera move, motion vectors will have lots of similar
+     * values, whereas if the camera zooms, the std is very high
+     */
+    uint64_t count = 0;
+    auto minimum = (uint32_t) (frame.mb_height() * frame.mb_width() *
+                               fraction);
+    std::set<MotionVector> mv_set;
+    for (const auto &s : motion_regions) {
+        if (s.size() > count && s.size() > minimum) {
+            mv_set = s;
+            count = s.size(); /* find the largest region */
+        }
+    }
+
+    /* compute the mean and std */
+    std::vector<int> x_list(mv_set.size());
+    std::vector<int> y_list(mv_set.size());
+    int i = 0;
+    for (const auto &mv : mv_set) {
+        x_list[i] = mv.mvL0[0];
+        y_list[i] = mv.mvL0[1];
+        i++;
+    }
+
+    double sum_x = std::accumulate(x_list.begin(), x_list.end(), 0.0);
+    double mean_x = sum_x / x_list.size();
+    double sq_sum_x = std::inner_product(x_list.begin(), x_list.end(),
+                                         x_list.begin(), 0.0);
+    double stdev_x = std::sqrt(sq_sum_x / x_list.size() - mean_x * mean_x);
+
+    double sum_y = std::accumulate(x_list.begin(), x_list.end(), 0.0);
+    double mean_y = sum_y / x_list.size();
+    double sq_sum_y = std::inner_product(x_list.begin(), x_list.end(),
+                                         x_list.begin(), 0.0);
+    double stdev_y = std::sqrt(sq_sum_y / x_list.size() - mean_y * mean_y);
+
+
+    bool zoom = std::abs(stdev_x) + std::abs(stdev_y) >
+                (std::abs(mean_x) + std::abs(mean_y));
+    bool move_right = mean_x < -1; /* reversed motion */
+    bool move_left = mean_x > 1;
+    bool move_up = mean_y < -1;
+    bool move_down = mean_y > 1;
+    bool no_motion = !(zoom || move_down || move_left || move_right || move_up);
+
+    std::map<MotionType, bool> result;
+
+    result[MotionType::NoMotion] = no_motion;
+    result[MotionType::TranslationRight] = move_right;
+    result[MotionType::TranslationUp] = move_up;
+    result[MotionType::TranslationLeft] = move_left;
+    result[MotionType::TranslationDown] = move_down;
+    result[MotionType::Zoom] = zoom;
+
+    return result;
+}
+
+std::set<MotionVector> background_filter(MvFrame & frame) {
+    /* http://ieeexplore.ieee.org/document/1334181
+     * http://ieeexplore.ieee.org/document/6872825
+     * http://ieeexplore.ieee.org/document/871569
+    */
+
+    /* my own algorithm based on these three papers */
+
+    /* 1: median filter to remove noise */
+    auto smooth_frame = median_filter(frame, 3);
+
+    /* 2: do an xor to obtain background motion */
+    /* detect actual object motions with high threshold */
+    auto obj_motions = mv_partition(frame, 10);
+    /* background motion with low threshold */
+    auto bg_motions = mv_partition(frame, 1);
+
+    /* flatten the motions */
+    std::set<MotionVector> obj_flatten;
+    std::set<MotionVector> bg_flatten;
+    for (const auto &set : obj_motions) {
+        obj_flatten.insert(set.begin(), set.end());
+    }
+    for (const auto &set : bg_motions) {
+        bg_flatten.insert(set.begin(), set.end());
+    }
+    /* xor */
+    std::set<MotionVector> background;
+    std::set_difference(bg_flatten.begin(), bg_flatten.end(),
+                        obj_flatten.begin(), obj_flatten.end(),
+                        std::inserter(background, background.begin()));
+    return background;
 }

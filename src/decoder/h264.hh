@@ -38,9 +38,7 @@ struct MotionVector {
     int mvL0[2] = {0, 0};
     uint32_t x = 0;
     uint32_t y = 0;
-
-    inline double motion_distance_L0() const
-    { return std::sqrt(mvL0[0] * mvL0[0] + mvL0[1] * mvL0[1]); }
+    uint32_t energy = 0;
 };
 
 class MvFrame {

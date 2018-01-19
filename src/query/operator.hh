@@ -18,6 +18,7 @@
 #define H264FLOW_OPERATOR_HH
 
 #include <set>
+#include <map>
 #include "../decoder/h264.hh"
 
 
@@ -107,11 +108,19 @@ std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
 
 enum MotionType {
     NoMotion = 0,
-    Translation = 1,
-    Rotation = 1 << 1,
-    ZoomIn = 1 << 2,
-    ZoomOut = 1 << 3
+    TranslationRight = 1,
+    TranslationUp = 1 << 1,
+    TranslationLeft = 1 << 2,
+    TranslationDown = 1 << 3,
+    Rotation = 1 << 4,
+    Zoom = 1 << 5
 };
 
-MotionType CategorizeMotion();
+std::map<MotionType, bool> CategorizeCameraMotion(MvFrame &frame,
+                                                    double threshold = 1,
+                                                    double fraction = 0.6);
+
+std::map<MotionType, bool> CategorizeCameraMotion(
+        MvFrame &frame, std::vector<std::set<MotionVector>> motion_regions,
+        double fraction = 0.6);
 #endif //H264FLOW_OPERATOR_HH

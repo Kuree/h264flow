@@ -439,6 +439,8 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
                     mb->pos_x() * 16,
                     mb->pos_y() * 16,
             };
+            mv.energy = uint32_t(mv.mvL0[0] * mv.mvL0[0] +
+                                         mv.mvL0[1] * mv.mvL0[1]);
             _mvs[i][j] = mv;
         }
     }

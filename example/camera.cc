@@ -22,44 +22,27 @@
 using namespace cv;
 using namespace std;
 
+
+void draw_text(Mat &mat, const string &type, bool value, int &y) {
+    int x = mat.cols >= 120 ? mat.cols / 2 - 60 : 0;
+    putText(mat, type + (value ? " True" :" False"), Point(x, y),
+            FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
+    y += 30;
+}
+
 void draw_mv(MvFrame &mvs, Mat &mat) {
-    for (uint32_t y = 0; y < mvs.mb_height(); y++) {
-        for (uint32_t x = 0; x < mvs.mb_width(); x++) {
-            auto mv = mvs.get_mv(x, y);
-            /* convert from block unit to pixel unit */
-            int mv_x = mv.mvL0[0];
-            int mv_y = mv.mvL0[1];
-            uint32_t start_x = x * 16 + 8;
-            uint32_t start_y = y * 16 + 8;
-            double norm = sqrt(mv_x * mv_x + mv_y + mv_y);
-            if (norm > 0) {
-                auto red = (uint8_t) ((norm / 25.0 * 255) < 255 ?
-                                      (norm / 25.0 * 255) : 255);
-                /* draw the vector */
-                arrowedLine(mat, Point(start_x, start_y),
-                            Point(start_x + mv_x, start_y + mv_y),
-                            Scalar(255 - red, 0, red), 2);
-            } else {
-                /* draw a dot instead */
-                circle(mat, Point(start_x, start_y), 1, Scalar(128, 128, 128),
-                       CV_FILLED);
-            }
-        }
-    }
-
-
     /* draw the motion region */
     std::vector<std::set<MotionVector>> regions = mv_partition(mvs, 4);
-    for (const auto &s : regions) {
-        for (const auto &p : s) {
-            if (p.x + 16 > (uint32_t)mat.cols || p.y + 16 > (uint32_t)mat.rows)
-                continue;
-            Mat roi = mat(Rect(p.x, p.y, 16, 16));
-            cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
-            float alpha = 0.3;
-            addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);
-        }
-    }
+
+    /* compute the camera movement and print it out to the frame */
+    auto cam_result = CategorizeCameraMotion(mvs, regions, 0.4);
+    int y = mat.rows / 2 - 75;
+    draw_text(mat, "No motion", cam_result[MotionType::NoMotion], y);
+    draw_text(mat, "Move right", cam_result[MotionType::TranslationRight], y);
+    draw_text(mat, "Move left", cam_result[MotionType::TranslationLeft], y);
+    draw_text(mat, "Move up", cam_result[MotionType::TranslationUp], y);
+    draw_text(mat, "Move down", cam_result[MotionType::TranslationDown], y);
+    draw_text(mat, "Zoom", cam_result[MotionType::Zoom], y);
 }
 
 int main(int argc, char *argv[]) {
@@ -87,7 +70,7 @@ int main(int argc, char *argv[]) {
         //mvs = median_filter(mvs, 3);
         draw_mv(mvs, frame);
         imshow("video", frame);
-        waitKey(10);
+        waitKey(50);
     }
     return EXIT_SUCCESS;
 }
