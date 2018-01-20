@@ -58,3 +58,8 @@ build
 
 # Python
 env
+
+# Train data
+dataset
+*.mv
+*.av

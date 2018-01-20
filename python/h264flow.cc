@@ -31,7 +31,7 @@ void init_h264(py::module &m) {
 
 void init_mv_frame(py::module &m) {
     py::class_<MvFrame>(m, "MvFrame").def(py::init<uint32_t, uint32_t, uint32_t, uint32_t>())
-            .def("get_mv", (MotionVector (MvFrame::*)(uint32_t, uint32_t))&MvFrame::get_mv)
+            .def("get_mv", (MotionVector (MvFrame::*)(uint32_t, uint32_t) const)&MvFrame::get_mv)
             .def("width", &MvFrame::width)
             .def("height", &MvFrame::height)
             .def_property_readonly("mvL0", [](MvFrame &mv) {

@@ -21,7 +21,7 @@
 
 void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
     std::ofstream stream;
-    stream.open(filename.c_str(), std::ios::trunc);
+    stream.open(filename.c_str(), std::ios::trunc | std::ios::binary);
     uint32_t size = frame.mb_width() * frame.mb_height();
     uint32_t width = frame.mb_width();
     uint32_t height = frame.mb_height();
@@ -43,7 +43,7 @@ MvFrame load_mv(std::string filename, uint32_t &label) {
     if (!file_exists(filename))
         throw std::runtime_error(filename + " does not exist");
     std::ifstream stream;
-    stream.open(filename);
+    stream.open(filename, std::ios::binary);
 
     uint32_t width = 0;
     uint32_t height = 0;
@@ -66,7 +66,7 @@ void dump_processed_mv(const MvFrame &frame, uint32_t label,
                        std::string filename) {
     auto mvs = background_filter(frame);
     std::ofstream stream;
-    stream.open(filename);
+    stream.open(filename, std::ios::binary);
     uint64_t size = mvs.size();
     stream.write((char*)&size, sizeof(size));
     stream.write((char*)&label, sizeof(label));
@@ -90,7 +90,7 @@ std::vector<double> load_processed_mv(const std::string & filename,
     if (!file_exists(filename))
         throw std::runtime_error(filename + " does not exist");
     std::ifstream stream;
-    stream.open(filename);
+    stream.open(filename, std::ios::binary);
     uint64_t size;
     stream.read((char*)&size, sizeof(size));
 
