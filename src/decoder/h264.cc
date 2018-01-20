@@ -446,6 +446,21 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
     }
 }
 
+MvFrame::MvFrame(const MvFrame &frame) : _height(frame._height),
+                                         _width(frame._width),
+                                         _mb_width(frame._mb_width),
+                                         _mb_height(frame._mb_height), _mvs() {
+    _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
+                                                  std::vector<MotionVector>(_mb_width));
+
+    for (uint32_t i = 0; i < _mb_height; i++) {
+        for (uint32_t j = 0; j < _mb_width; j++) {
+            _mvs[i][j] = frame._mvs[i][j];
+        }
+    }
+
+}
+
 MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
                  uint32_t mb_height, bool p_frame)
         : _height(pic_height), _width(pic_width), _mb_width(mb_width),

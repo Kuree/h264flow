@@ -46,6 +46,8 @@ public:
     explicit MvFrame(ParserContext &ctx);
     MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
             uint32_t mb_height, bool p_frame = false);
+    MvFrame() : _mvs() {}
+    MvFrame(const MvFrame& frame);
     MotionVector get_mv(uint32_t mb_addr) const;
     MotionVector get_mv(uint32_t x, uint32_t y) const;
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)

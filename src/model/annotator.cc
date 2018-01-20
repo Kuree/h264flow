@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     bool camera_down = false;
     bool camera_zoom_in = false;
     bool camera_zoom_out = false;
-    MvFrame * mv_frame = nullptr;
+    MvFrame mv_frame;
 
     Action pause_action = [&] (int) { pause = !pause; };
     Action left_action = [&] (bool state) { camera_left = state; };
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     Action zoom_in_action = [&] (bool state) { camera_zoom_in = state; };
     Action zoom_out_action = [&] (bool state) { camera_zoom_out = state; };
     Action save_action = [&] (int) {
-        if (mv_frame) {
+        if (mv_frame.mb_height() > 0) {
             /* dump the frame_num */
             /* TODO: fix this */
             string output_filename = output_dir + "/" + prefix + "_" +
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
             uint32_t label = create_label(camera_left, camera_right, camera_up,
                                           camera_down, camera_zoom_in,
                                           camera_zoom_out);
-            dump_mv(*mv_frame, label, output_filename);
+            dump_mv(mv_frame, label, output_filename);
         }
     };
 
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
         if (frame.empty())
             break;
         MvFrame mvs = decoder->load_frame((uint32_t)frame_num);
-        mv_frame = &mvs;
+        mv_frame = MvFrame(mvs); /* copy constructor */
         draw_mv(mvs, frame);
         imshow("main", frame);
 

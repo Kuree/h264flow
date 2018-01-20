@@ -34,8 +34,7 @@ void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
     /* dump each struct to the stream */
     for (uint32_t i = 0; i < size; i++) {
         auto mv = frame.get_mv(i);
-        auto data = reinterpret_cast<char*>(&mv);
-        stream.write(data, sizeof(mv));
+        stream.write((char*)&mv, sizeof(mv));
     }
     stream.close();
 }
