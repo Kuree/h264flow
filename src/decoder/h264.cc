@@ -454,11 +454,11 @@ MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
                                                   std::vector<MotionVector>(_mb_width));
 }
 
-MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) {
+MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) const {
     return _mvs[y][x];
 }
 
-MotionVector MvFrame::get_mv(uint32_t mb_addr) {
+MotionVector MvFrame::get_mv(uint32_t mb_addr) const {
     uint32_t j = mb_addr % _mb_width;
     uint32_t i = mb_addr / _mb_width;
     return _mvs[i][j];

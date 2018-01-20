@@ -102,7 +102,7 @@ std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
                                       uint32_t col_start, uint32_t width,
                                       uint32_t height, uint32_t bins);
 
-std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
+std::vector<std::set<MotionVector>> mv_partition(const MvFrame &frame,
                                                  double threshold);
 
 
@@ -123,4 +123,7 @@ std::map<MotionType, bool> CategorizeCameraMotion(MvFrame &frame,
 std::map<MotionType, bool> CategorizeCameraMotion(
         MvFrame &frame, std::vector<std::set<MotionVector>> motion_regions,
         double fraction = 0.6);
+
+std::set<MotionVector> background_filter(const MvFrame & frame);
+
 #endif //H264FLOW_OPERATOR_HH

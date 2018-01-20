@@ -46,11 +46,13 @@ public:
     explicit MvFrame(ParserContext &ctx);
     MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
             uint32_t mb_height, bool p_frame = false);
-    MotionVector get_mv(uint32_t mb_addr);
-    MotionVector get_mv(uint32_t x, uint32_t y);
+    MotionVector get_mv(uint32_t mb_addr) const;
+    MotionVector get_mv(uint32_t x, uint32_t y) const;
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
     { _mvs[y][x] = mv; }
-    inline std::vector<MotionVector> get_row(uint32_t row)
+    inline void set_mv(uint32_t mb_addr, MotionVector mv)
+    { _mvs[mb_addr / _mb_width][mb_addr % _mb_width] = mv; }
+    inline std::vector<MotionVector> get_row(uint32_t row) const
     { return _mvs[row]; }
 
     inline uint32_t height() const { return _height; }

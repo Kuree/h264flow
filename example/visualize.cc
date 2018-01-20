@@ -89,5 +89,9 @@ int main(int argc, char *argv[]) {
         imshow("video", frame);
         waitKey(10);
     }
+
+    destroyAllWindows();
+    capture.release();
+
     return EXIT_SUCCESS;
 }

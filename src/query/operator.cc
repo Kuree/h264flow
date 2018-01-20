@@ -45,7 +45,7 @@ void CropOperator::reduce() {
     _frame = frame;
 }
 
-MvFrame median_filter(MvFrame &frame, uint32_t size) {
+MvFrame median_filter(const MvFrame &frame, uint32_t size) {
     MvFrame result = MvFrame(frame.width(), frame.height(), frame.mb_width(),
                              frame.mb_height());
     uint32_t median_element = size / 2;
@@ -147,7 +147,7 @@ bool operator<(const MotionVector &p1, const MotionVector &p2) {
 }
 
 void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
-                MvFrame &frame, uint32_t index, uint32_t width,
+                const MvFrame &frame, uint32_t index, uint32_t width,
                 uint32_t height) {
     if (visited[index]) return;
     result.insert(frame.get_mv(index));
@@ -172,7 +172,7 @@ void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
     }
 }
 
-std::vector<std::set<MotionVector>> mv_partition(MvFrame &frame,
+std::vector<std::set<MotionVector>> mv_partition(const MvFrame &frame,
                                                  double threshold) {
     std::vector<bool> visited = std::vector<bool>(frame.mb_height() *
                                                           frame.mb_width(),
@@ -276,7 +276,7 @@ std::map<MotionType, bool> CategorizeCameraMotion(
     return result;
 }
 
-std::set<MotionVector> background_filter(MvFrame & frame) {
+std::set<MotionVector> background_filter(const MvFrame & frame) {
     /* http://ieeexplore.ieee.org/document/1334181
      * http://ieeexplore.ieee.org/document/6872825
      * http://ieeexplore.ieee.org/document/871569
@@ -291,7 +291,7 @@ std::set<MotionVector> background_filter(MvFrame & frame) {
     /* detect actual object motions with high threshold */
     auto obj_motions = mv_partition(frame, 10);
     /* background motion with low threshold */
-    auto bg_motions = mv_partition(frame, 1);
+    auto bg_motions = mv_partition(frame, 0.5);
 
     /* flatten the motions */
     std::set<MotionVector> obj_flatten;

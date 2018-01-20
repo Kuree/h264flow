@@ -174,6 +174,7 @@ class BinaryWriter {
 public:
     explicit BinaryWriter(std::ostream & stream) : _stream(stream) {}
     void write_uint8(uint8_t value);
+    void write_uint32(uint32_t value);
 private:
     std::ostream & _stream;
 };

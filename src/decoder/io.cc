@@ -142,6 +142,11 @@ void BinaryWriter::write_uint8(uint8_t value) {
     _stream.write(buf, sizeof(value));
 }
 
+void BinaryWriter::write_uint32(uint32_t value) {
+    auto buf = reinterpret_cast<char *>(&value);
+    _stream.write(buf, sizeof(value));
+}
+
 int64_t BitReader::read_se() {
     uint64_t value = read_ue();
     auto result = static_cast<int64_t>(std::ceil(value / 2.0));
