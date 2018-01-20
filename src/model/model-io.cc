@@ -40,7 +40,7 @@ void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
     stream.close();
 }
 
-MvFrame load_mv(std::string filename, uint32_t &label) {
+std::tuple<MvFrame, uint32_t> load_mv(std::string filename) {
     if (!file_exists(filename))
         throw std::runtime_error(filename + " does not exist");
     std::ifstream stream;
@@ -48,6 +48,7 @@ MvFrame load_mv(std::string filename, uint32_t &label) {
 
     uint32_t width = 0;
     uint32_t height = 0;
+    uint32_t label = 0;
     stream.read((char*)&width, sizeof(width));
     stream.read((char*)&height, sizeof(height));
     stream.read((char*)&label, sizeof(label));
@@ -60,7 +61,7 @@ MvFrame load_mv(std::string filename, uint32_t &label) {
         frame.set_mv(i, mv);
     }
     stream.close();
-    return frame;
+    return std::make_tuple(frame, label);
 }
 
 void dump_processed_mv(const MvFrame &frame, uint32_t label,

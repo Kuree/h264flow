@@ -21,7 +21,7 @@
 
 void dump_mv(const MvFrame &frame, uint32_t label, std::string filename);
 
-MvFrame load_mv(std::string filename, uint32_t &label);
+std::tuple<MvFrame, uint32_t> load_mv(std::string filename);
 
 uint32_t create_label(bool left, bool right, bool up, bool down,
                       bool zoom_in, bool zoom_out);

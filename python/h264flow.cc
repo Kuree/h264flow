@@ -18,6 +18,7 @@
 #include <pybind11/numpy.h>
 #include "../src/decoder/h264.hh"
 #include "../src/query/operator.hh"
+#include "../src/model/model-io.hh"
 
 namespace py = pybind11;
 
@@ -73,11 +74,41 @@ void init_op(py::module &m) {
             .def("execute", &ReduceOperator::execute);
 }
 
+void init_model(py::module &m) {
+    m.def("load_mv", &load_mv);
+    m.def("dump_mv", &dump_mv);
+    m.def("create_mv", [](py::array_t<double> array) {
+        auto shape = array.shape();
+        if (shape[2] != 2)
+            throw std::runtime_error("array has to be a vector field");
+        auto matrix = array.mutable_unchecked<3>();
+        auto height = (uint32_t)shape[0];
+        auto width = (uint32_t)shape[1];
+        MvFrame frame(width * 16, height * 16, width, height, false);
+        for (uint32_t i = 0; i < height; i++) {
+            for (uint32_t j = 0; j < width; j++) {
+                auto x = (int)matrix(i, j, 0);
+                auto y = (int)matrix(i, j, i);
+                MotionVector mv {
+                        x,
+                        y,
+                        j,
+                        i,
+                        (uint32_t)(x * x + y * y)
+                };
+                frame.set_mv(j, i, mv);
+            }
+        }
+        return frame;
+    });
+}
+
 PYBIND11_PLUGIN(h264flow) {
     py::module m("h264flow", "h264flow python binding");
     init_h264(m);
     init_mv_frame(m);
     init_mv(m);
     init_op(m);
+    init_model(m);
     return m.ptr();
 }

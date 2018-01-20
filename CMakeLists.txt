@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.9)
 project(h264flow)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-pedantic -Wall -Wextra -Weffc++ -Werror -fPIC")
+set(CMAKE_CXX_FLAGS "-pedantic -Wall -Wextra -Weffc++ -Werror -fPIC -pthread")
 
 # default release
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif(NOT CMAKE_BUILD_TYPE)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 
 
 add_subdirectory(python/pybind11)
