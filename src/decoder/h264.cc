@@ -452,6 +452,14 @@ MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
           _mb_height(mb_height), _mvs(), _p_frame(p_frame) {
     _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
                                                   std::vector<MotionVector>(_mb_width));
+    for (uint32_t i = 0; i < _mb_height; i++) {
+        for (uint32_t j = 0; j < _mb_height; j++) {
+            MotionVector mv;
+            mv.x = j;
+            mv.y = i;
+            _mvs[i][j] = mv;
+        }
+    }
 }
 
 MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) const {

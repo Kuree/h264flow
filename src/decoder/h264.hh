@@ -62,7 +62,7 @@ public:
 
     inline std::vector<MotionVector>operator[](uint32_t y) { return _mvs[y]; }
 
-    inline bool p_frame() { return _p_frame; }
+    inline bool p_frame() const { return _p_frame; }
 
 private:
     uint32_t _height = 0;

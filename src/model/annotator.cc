@@ -15,7 +15,9 @@
  */
 
 #include <opencv2/opencv.hpp>
+#include <mutex>
 #include "../model/model-io.hh"
+
 #include <functional>
 #include "../decoder/h264.hh"
 
@@ -23,6 +25,33 @@ using namespace cv;
 using namespace std;
 
 using Action = std::function<void(int)>;
+
+void draw_mv(MvFrame &mvs, Mat &mat) {
+    for (uint32_t y = 0; y < mvs.mb_height(); y++) {
+        for (uint32_t x = 0; x < mvs.mb_width(); x++) {
+            auto mv = mvs.get_mv(x, y);
+            /* convert from block unit to pixel unit */
+            int mv_x = mv.mvL0[0];
+            int mv_y = mv.mvL0[1];
+            uint32_t start_x = x * 16 + 8;
+            uint32_t start_y = y * 16 + 8;
+            double norm = sqrt(mv_x * mv_x + mv_y + mv_y);
+            if (norm > 0) {
+                auto red = (uint8_t) ((norm / 25.0 * 255) < 255 ?
+                                      (norm / 25.0 * 255) : 255);
+                /* draw the vector */
+                arrowedLine(mat, Point(start_x, start_y),
+                            Point(start_x + mv_x, start_y + mv_y),
+                            Scalar(255 - red, 0, red), 2);
+            } else {
+                /* draw a dot instead */
+                circle(mat, Point(start_x, start_y), 1, Scalar(128, 128, 128),
+                       CV_FILLED);
+            }
+        }
+    }
+}
+
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
@@ -44,12 +73,22 @@ int main(int argc, char *argv[]) {
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
     int frame_num = 0;
-    int pre_frame_num = frame_num;
+    int pts = 0;
+    bool has_seek = false;
     auto total_frame_num = (int)decoder->index_size();
 
-    namedWindow("main", CV_WINDOW_NORMAL);
-    createTrackbar("track", "main", &frame_num, total_frame_num);
-
+    namedWindow("main", CV_WINDOW_AUTOSIZE);
+    cv::TrackbarCallback track_callback = [] (int state, void* user_data) {
+        (*(Action*)user_data)(state);
+    };
+    Action seek = [&] (int) {
+        if (pts < frame_num - 5 || pts > frame_num + 5) {
+            has_seek = true;
+            pts = frame_num;
+        }
+    };
+    createTrackbar("track", "main", &frame_num, total_frame_num, track_callback,
+                   &seek);
 
     /* control values */
     bool pause = false;
@@ -109,18 +148,21 @@ int main(int argc, char *argv[]) {
         camera_zoom_in = false;
         camera_zoom_out = false;
 
-        if (pre_frame_num != frame_num -1
-            && !capture.set(CV_CAP_PROP_POS_MSEC, frame_num))
-            cerr << "failed to set frame number " << frame_num << endl;
+        if (has_seek) {
+            if (!capture.set(CV_CAP_PROP_POS_FRAMES, frame_num))
+                cerr << "failed to set frame number " << frame_num << endl;
+            has_seek = false;
+        }
         capture >> frame;
         if (frame.empty())
             break;
         MvFrame mvs = decoder->load_frame((uint32_t)frame_num);
         mv_frame = &mvs;
+        draw_mv(mvs, frame);
         imshow("main", frame);
 
-        pre_frame_num = frame_num;
         frame_num++;
+        pts++;
         setTrackbarPos("track", "main", frame_num);
         waitKey(10);
     }

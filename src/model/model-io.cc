@@ -20,6 +20,7 @@
 #include "../query/operator.hh"
 
 void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
+    if (!frame.p_frame()) return;
     std::ofstream stream;
     stream.open(filename.c_str(), std::ios::trunc | std::ios::binary);
     uint32_t size = frame.mb_width() * frame.mb_height();
