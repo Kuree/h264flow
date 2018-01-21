@@ -12,7 +12,8 @@ endif()
 add_executable(train_model train_model.cc)
 add_subdirectory(tiny-dnn)
 include_directories(tiny-dnn)
-#target_link_libraries(train_model tiny-dnn)
+
+target_link_libraries(train_model h264)
 
 # disable warnings for tiny-dnn
 set_source_files_properties(train_model.cc PROPERTIES COMPILE_FLAGS

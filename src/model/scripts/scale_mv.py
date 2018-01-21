@@ -33,13 +33,12 @@ def main():
                                         (OUTPUT_HEIGHT / matrix.shape[0],
                                          OUTPUT_WIDTH / matrix.shape[1], 2))
         prefix, ext = os.path.basename(input_file).split(".")
-        output_filename = prefix + ".pmv"
+        output_filename = prefix + ".mv"
         output_filename = os.path.join(output_dir, output_filename)
         mv = create_mv(matrix)
         dump_mv(mv, label, output_filename)
         print("data dumped to", output_filename)
         break
-
 
 
 if __name__ == "__main__":
