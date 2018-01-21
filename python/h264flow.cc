@@ -88,12 +88,12 @@ void init_model(py::module &m) {
         for (uint32_t i = 0; i < height; i++) {
             for (uint32_t j = 0; j < width; j++) {
                 auto x = (int)matrix(i, j, 0);
-                auto y = (int)matrix(i, j, i);
+                auto y = (int)matrix(i, j, 1);
                 MotionVector mv {
                         x,
                         y,
-                        j,
-                        i,
+                        j * 16,
+                        i * 16,
                         (uint32_t)(x * x + y * y)
                 };
                 frame.set_mv(j, i, mv);

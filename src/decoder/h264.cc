@@ -468,7 +468,7 @@ MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
     _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
                                                   std::vector<MotionVector>(_mb_width));
     for (uint32_t i = 0; i < _mb_height; i++) {
-        for (uint32_t j = 0; j < _mb_height; j++) {
+        for (uint32_t j = 0; j < _mb_width; j++) {
             MotionVector mv;
             mv.x = j;
             mv.y = i;

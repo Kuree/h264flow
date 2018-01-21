@@ -2,8 +2,13 @@ from h264flow import load_mv, dump_mv, create_mv
 from os import path
 import sys
 import os
-import scipy
 import glob
+import numpy as np
+import scipy.ndimage
+
+# keep the aspect ratio
+OUTPUT_WIDTH = 16 * 5
+OUTPUT_HEIGHT = 9 * 5
 
 
 def main():
@@ -21,11 +26,20 @@ def main():
     input_files = glob.glob(input_dir + "/*.mv")
 
     for input_file in input_files:
-        print(input_file)
         mv_frame, label = load_mv(input_file)
         matrix = mv_frame.mvL0
-        print(matrix[0][0])
+        if matrix.shape[0] != OUTPUT_HEIGHT or matrix.shape[1] != OUTPUT_WIDTH:
+            matrix = scipy.ndimage.zoom(matrix,
+                                        (OUTPUT_HEIGHT / matrix.shape[0],
+                                         OUTPUT_WIDTH / matrix.shape[1], 2))
+        prefix, ext = os.path.basename(input_file).split(".")
+        output_filename = prefix + ".pmv"
+        output_filename = os.path.join(output_dir, output_filename)
+        mv = create_mv(matrix)
+        dump_mv(mv, label, output_filename)
+        print("data dumped to", output_filename)
         break
+
 
 
 if __name__ == "__main__":
