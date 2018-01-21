@@ -15,18 +15,22 @@
  */
 
 #include "../src/decoder/h264.hh"
-#include "../src/decoder/util.hh"
-#include <iomanip>
+#include "../src/util/argparser.hh"
+#include "../src/util/exception.hh"
 
 using namespace std;
 
 int main(int argc, char * argv[]) {
-    if (argc != 3) {
-        cerr << "Usage: " << argv[0] << " <file_name> <frame_number>" << endl;
+    ArgParser parser("Read motion vectors from a media file "
+                     "and print them out");
+    parser.add_arg("-i", "input", "media file input");
+    parser.add_arg("-n", "frame_num", "frame number to extract");
+    if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
-    }
-    char * filename = argv[1];
-    uint32_t frame_num = (uint32_t)stoi(argv[2]);
+    auto arg_values = parser.get_args();
+    string filename = arg_values["input"];
+    uint32_t frame_num = (uint32_t)stoi(arg_values["frame_num"]);
+
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
     try {

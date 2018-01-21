@@ -18,11 +18,12 @@
 #include <opencv2/opencv.hpp>
 #include "../src/query/operator.hh"
 #include "../src/decoder/h264.hh"
+#include "../src/util/argparser.hh"
 
 using namespace cv;
 using namespace std;
 
-void draw_mv(MvFrame &mvs, Mat &mat) {
+void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
@@ -49,7 +50,8 @@ void draw_mv(MvFrame &mvs, Mat &mat) {
 
 
     /* draw the motion region */
-    std::vector<std::set<MotionVector>> regions = mv_partition(mvs, 4);
+    std::vector<std::set<MotionVector>> regions = mv_partition(mvs,
+                                                               region_threshold);
     for (const auto &s : regions) {
         for (const auto &p : s) {
             if (p.x + 16 > (uint32_t)mat.cols || p.y + 16 > (uint32_t)mat.rows)
@@ -63,11 +65,25 @@ void draw_mv(MvFrame &mvs, Mat &mat) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        cerr << "Usage: " << argv[0] << " <filename>" << endl;
+    ArgParser parser("Read motion vectors from a media file "
+                             "and print them out");
+    parser.add_arg("-i", "input", "media file input");
+    parser.add_arg("-m", "median", "median filter size. set to 0 to disable. "
+            "default is 0.", false);
+    parser.add_arg("-t", "threshold", "threshold to perform motion region partition. "
+            "default is 4.", false);
+    if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
-    }
-    string filename = argv[1];
+    auto arg_values = parser.get_args();
+
+    string filename = arg_values["input"];
+    uint32_t median = 0;
+    if (arg_values.find("median") != arg_values.end())
+        median = (uint32_t)stoi(arg_values["median"]);
+    uint32_t motion_threshold = 4;
+    if (arg_values.find("threshold") != arg_values.end())
+        motion_threshold = (uint32_t)stoi(arg_values["threshold"]);
+
     VideoCapture capture(filename);
     Mat frame;
     if (!capture.isOpened())
@@ -84,8 +100,9 @@ int main(int argc, char *argv[]) {
             break;
         MvFrame mvs = decoder->load_frame(frame_counter);
         /* median filter */
-        //mvs = median_filter(mvs, 3);
-        draw_mv(mvs, frame);
+        if (median)
+            mvs = median_filter(mvs, median);
+        draw_mv(mvs, frame, motion_threshold);
         imshow("video", frame);
         waitKey(10);
     }

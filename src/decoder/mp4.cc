@@ -14,10 +14,11 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mp4.hh"
-#include "util.hh"
 #include <sstream>
 #include <map>
+#include "mp4.hh"
+#include "util.hh"
+#include "../util/filesystem.hh"
 
 using std::string;
 

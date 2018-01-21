@@ -17,17 +17,9 @@
 #ifndef H264FLOW_UTIL_HH
 #define H264FLOW_UTIL_HH
 
-#include <stdexcept>
 #include <algorithm>
 #include <vector>
 #include "io.hh"
-
-class NotImplemented : public std::logic_error
-{
-public:
-    NotImplemented(std::string func_name) :
-            std::logic_error(func_name + " not yet implemented") { };
-};
 
 /**
  Calculate the log base 2 of the argument, rounded up.
@@ -79,9 +71,5 @@ int MbPredLuma(uint64_t mb_type);
 int MbPredChroma(uint64_t mb_type);
 
 bool is_p_slice(uint8_t first_byte);
-
-bool file_exists(const std::string &filename);
-
-std::string file_extension(const std::string &filename);
 
 #endif //H264FLOW_UTIL_HH

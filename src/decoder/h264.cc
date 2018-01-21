@@ -17,7 +17,8 @@
 #include <sstream>
 #include "h264.hh"
 #include "util.hh"
-#include "consts.hh"
+#include "../util/exception.hh"
+#include "../util/filesystem.hh"
 
 using std::shared_ptr;
 using std::runtime_error;

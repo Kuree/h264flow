@@ -92,7 +92,7 @@ private:
 };
 
 
-MvFrame median_filter(MvFrame &frame, uint32_t size);
+MvFrame median_filter(const MvFrame &frame, uint32_t size);
 MvFrame horizontal_filter(MvFrame &frame);
 MvFrame vertical_filter(MvFrame &frame);
 

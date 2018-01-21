@@ -17,7 +17,7 @@
 #include <iostream>
 #include "tiny-dnn/tiny_dnn/tiny_dnn.h"
 #include <dirent.h>
-#include "../decoder/util.hh"
+#include "../util/filesystem.hh"
 #include "model-io.hh"
 
 

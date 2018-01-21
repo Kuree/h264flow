@@ -18,6 +18,7 @@
 #include "model-io.hh"
 #include "../decoder/util.hh"
 #include "../query/operator.hh"
+#include "../util/filesystem.hh"
 
 void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
     if (!frame.p_frame()) return;

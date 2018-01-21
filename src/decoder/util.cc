@@ -14,8 +14,6 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <unistd.h>
-#include <sys/stat.h>
 #include "util.hh"
 #include "consts.hh"
 
@@ -178,14 +176,4 @@ bool is_p_slice(uint8_t first_byte) {
         throw std::runtime_error("forbidden 0 bit is set");
     int nal_unit_type = first_byte & 0x1F;
     return nal_unit_type >= 1 && nal_unit_type <= 4;
-}
-
-bool file_exists(const std::string &filename) {
-    struct stat buffer;
-    return (stat (filename.c_str(), &buffer) == 0);
-}
-
-std::string file_extension(const std::string &filename) {
-    auto period = filename.find_last_of(".");
-    return filename.substr(period);
 }

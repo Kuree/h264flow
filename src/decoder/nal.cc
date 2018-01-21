@@ -16,11 +16,11 @@
 
 #include <sstream>
 #include <algorithm>
+#include <string>
 #include "nal.hh"
 #include "util.hh"
+#include "../util/exception.hh"
 
-
-#include <string>
 
 using std::shared_ptr;
 using std::make_shared;
