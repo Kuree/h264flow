@@ -172,12 +172,22 @@ void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
     }
 }
 
-std::vector<std::set<MotionVector>> mv_partition(const MvFrame &frame,
+std::pair<float, float> compute_centroid(const std::set<MotionVector> &set) {
+    float sum_x = 0, sum_y = 0;
+    for (const auto &mv : set) {
+        sum_x += mv.mvL0[0];
+        sum_y += mv.mvL0[1];
+    }
+    uint64_t size = set.size();
+    return std::make_pair(sum_x / size, sum_y / size);
+}
+
+std::vector<MotionRegion> mv_partition(const MvFrame &frame,
                                                  double threshold) {
     std::vector<bool> visited = std::vector<bool>(frame.mb_height() *
                                                           frame.mb_width(),
                                               true);
-    std::vector<std::set<MotionVector>> result;
+    std::vector<MotionRegion> result;
     for (uint32_t i = 0; i < visited.size(); i++) {
         MotionVector mv = frame.get_mv(i);
         if (mv.energy > threshold)
@@ -199,8 +209,13 @@ std::vector<std::set<MotionVector>> mv_partition(const MvFrame &frame,
         std::set<MotionVector> s;
         add_points(visited, s, frame, index, frame.mb_width(),
                    frame.mb_height());
-        if (s.size() > 1)
-            result.emplace_back(s);
+        if (s.size() > 1) {
+            /* compute centroid */
+            float x, y;
+            std::tie(x, y) = compute_centroid(s);
+            MotionRegion mr (s, x, y);
+            result.emplace_back(mr);
+        }
         index++;
     }
     return result;
@@ -212,7 +227,7 @@ std::map<MotionType, bool> CategorizeCameraMotion(MvFrame &frame, double thresho
 }
 
 std::map<MotionType, bool> CategorizeCameraMotion(
-        MvFrame &frame, std::vector<std::set<MotionVector>> motion_regions,
+        MvFrame &frame, std::vector<MotionRegion> motion_regions,
         double fraction) {
     /*
      * Naive approach:
@@ -225,19 +240,19 @@ std::map<MotionType, bool> CategorizeCameraMotion(
     uint64_t count = 0;
     auto minimum = (uint32_t) (frame.mb_height() * frame.mb_width() *
                                fraction);
-    std::set<MotionVector> mv_set;
-    for (const auto &s : motion_regions) {
-        if (s.size() > count && s.size() > minimum) {
-            mv_set = s;
-            count = s.size(); /* find the largest region */
+    MotionRegion mv_set;
+    for (const auto &region : motion_regions) {
+        if (region.mvs.size() > count && region.mvs.size() > minimum) {
+            mv_set = region;
+            count = region.mvs.size(); /* find the largest region */
         }
     }
 
     /* compute the mean and std */
-    std::vector<float> x_list(mv_set.size());
-    std::vector<float> y_list(mv_set.size());
+    std::vector<float> x_list(mv_set.mvs.size());
+    std::vector<float> y_list(mv_set.mvs.size());
     int i = 0;
-    for (const auto &mv : mv_set) {
+    for (const auto &mv : mv_set.mvs) {
         x_list[i] = mv.mvL0[0];
         y_list[i] = mv.mvL0[1];
         i++;
@@ -297,10 +312,10 @@ std::set<MotionVector> background_filter(const MvFrame & frame) {
     std::set<MotionVector> obj_flatten;
     std::set<MotionVector> bg_flatten;
     for (const auto &set : obj_motions) {
-        obj_flatten.insert(set.begin(), set.end());
+        obj_flatten.insert(set.mvs.begin(), set.mvs.end());
     }
     for (const auto &set : bg_motions) {
-        bg_flatten.insert(set.begin(), set.end());
+        bg_flatten.insert(set.mvs.begin(), set.mvs.end());
     }
     /* xor */
     std::set<MotionVector> background;

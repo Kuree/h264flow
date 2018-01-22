@@ -32,7 +32,7 @@ void draw_text(Mat &mat, const string &type, bool value, int &y) {
 
 void draw_mv(MvFrame &mvs, Mat &mat) {
     /* draw the motion region */
-    std::vector<std::set<MotionVector>> regions = mv_partition(mvs, 4);
+    std::vector<MotionRegion> regions = mv_partition(mvs, 4);
 
     /* compute the camera movement and print it out to the frame */
     auto cam_result = CategorizeCameraMotion(mvs, regions, 0.4);

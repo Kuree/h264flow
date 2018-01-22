@@ -50,10 +50,9 @@ void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
 
 
     /* draw the motion region */
-    std::vector<std::set<MotionVector>> regions = mv_partition(mvs,
-                                                               region_threshold);
+    std::vector<MotionRegion> regions = mv_partition(mvs, region_threshold);
     for (const auto &s : regions) {
-        for (const auto &p : s) {
+        for (const auto &p : s.mvs) {
             if (p.x + 16 > (uint32_t)mat.cols || p.y + 16 > (uint32_t)mat.rows)
                 continue;
             Mat roi = mat(Rect(p.x, p.y, 16, 16));

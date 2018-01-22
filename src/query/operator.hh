@@ -102,7 +102,17 @@ std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
                                       uint32_t col_start, uint32_t width,
                                       uint32_t height, uint32_t bins);
 
-std::vector<std::set<MotionVector>> mv_partition(const MvFrame &frame,
+struct MotionRegion {
+    std::set<MotionVector> mvs;
+    /* those are centroid */
+    float x = 0;
+    float y = 0;
+    MotionRegion(std::set<MotionVector> mvs, float x, float y)
+            : mvs(mvs), x(x), y(y) {}
+    MotionRegion() : mvs() {}
+};
+
+std::vector<MotionRegion> mv_partition(const MvFrame &frame,
                                                  double threshold);
 
 
@@ -121,7 +131,7 @@ std::map<MotionType, bool> CategorizeCameraMotion(MvFrame &frame,
                                                     double fraction = 0.6);
 
 std::map<MotionType, bool> CategorizeCameraMotion(
-        MvFrame &frame, std::vector<std::set<MotionVector>> motion_regions,
+        MvFrame &frame, std::vector<MotionRegion> motion_regions,
         double fraction = 0.6);
 
 std::set<MotionVector> background_filter(const MvFrame & frame);
