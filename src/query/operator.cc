@@ -55,8 +55,8 @@ MvFrame median_filter(const MvFrame &frame, uint32_t size) {
         for (uint32_t j = median_element;
              j < frame.mb_width() - median_element; j++) {
             /* TODO: optimize this */
-            std::vector<int> mv0 = std::vector<int>(size * size - 1);
-            std::vector<int> mv1 = std::vector<int>(size * size - 1);
+            std::vector<float> mv0 = std::vector<float>(size * size - 1);
+            std::vector<float> mv1 = std::vector<float>(size * size - 1);
             uint32_t counter = 0;
             for (uint32_t k = 0; k < size * size; k++) {
                 int row = k / size - median_element;
@@ -116,8 +116,8 @@ std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
     for (uint32_t i = row_start; i < row_start + height; i++) {
         for (uint32_t j = col_start; j < col_start + width; j++) {
             MotionVector mv = frame.get_mv(j, i);
-            int x = mv.mvL0[1];
-            int y = mv.mvL0[0];
+            float x = mv.mvL0[1];
+            float y = mv.mvL0[0];
             if (x == 0 && y > 0) {
                 result[bins / 4] += 1;
             } else if (x == 0 && y < 0) {
@@ -234,8 +234,8 @@ std::map<MotionType, bool> CategorizeCameraMotion(
     }
 
     /* compute the mean and std */
-    std::vector<int> x_list(mv_set.size());
-    std::vector<int> y_list(mv_set.size());
+    std::vector<float> x_list(mv_set.size());
+    std::vector<float> y_list(mv_set.size());
     int i = 0;
     for (const auto &mv : mv_set) {
         x_list[i] = mv.mvL0[0];

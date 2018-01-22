@@ -78,8 +78,8 @@ void dump_processed_mv(const MvFrame &frame, uint32_t label,
 }
 
 double get_angle(const MotionVector & mv) {
-    int x = mv.mvL0[0];
-    int y = mv.mvL0[1];
+    float x = mv.mvL0[0];
+    float y = mv.mvL0[1];
     double angle = atan2(y, x);
     if (angle < 0)
         return angle + 2 * M_PI;

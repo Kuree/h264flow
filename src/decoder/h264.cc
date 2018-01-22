@@ -138,7 +138,7 @@ void h264::index_nal() {
 }
 
 h264::h264(std::shared_ptr<BitStream> stream)
-        : _chunk_offsets(), _bit_stream(stream) {
+        : _chunk_offsets(), _bit_stream(std::move(stream)) {
     load_bitstream();
 }
 
@@ -435,8 +435,8 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             if (mb->pos_x() != j || mb->pos_y() != i)
                 throw std::runtime_error("pos does not match");
             MotionVector mv {
-                    -mb->mvL[0][0][0][0] / 4,
-                    -mb->mvL[0][0][0][1] / 4,
+                    -mb->mvL[0][0][0][0] / 4.0f,
+                    -mb->mvL[0][0][0][1] / 4.0f,
                     mb->pos_x() * 16,
                     mb->pos_y() * 16,
             };

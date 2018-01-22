@@ -18,9 +18,6 @@
 #include <mutex>
 #include "../model/model-io.hh"
 
-#include <functional>
-#include "../decoder/h264.hh"
-
 using namespace cv;
 using namespace std;
 
@@ -31,8 +28,8 @@ void draw_mv(MvFrame &mvs, Mat &mat) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
             /* convert from block unit to pixel unit */
-            int mv_x = mv.mvL0[0];
-            int mv_y = mv.mvL0[1];
+            auto mv_x = (int)mv.mvL0[0];
+            auto mv_y = (int)mv.mvL0[1];
             uint32_t start_x = x * 16 + 8;
             uint32_t start_y = y * 16 + 8;
             double norm = sqrt(mv_x * mv_x + mv_y + mv_y);
@@ -125,7 +122,7 @@ int main(int argc, char *argv[]) {
     };
 
     createButton("pause", btn_callback, &pause_action,
-                 QT_PUSH_BUTTON, 0);
+                 QT_PUSH_BUTTON, false);
     createButton("camera up", btn_callback, &up_action, QT_CHECKBOX | QT_NEW_BUTTONBAR);
     createButton("camera down", btn_callback, &down_action, QT_CHECKBOX | QT_NEW_BUTTONBAR);
     createButton("camera left", btn_callback, &left_action, QT_CHECKBOX | QT_NEW_BUTTONBAR);

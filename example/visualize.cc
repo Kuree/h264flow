@@ -28,8 +28,8 @@ void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
             /* convert from block unit to pixel unit */
-            int mv_x = mv.mvL0[0];
-            int mv_y = mv.mvL0[1];
+            auto mv_x = (int)mv.mvL0[0];
+            auto mv_y = (int)mv.mvL0[1];
             uint32_t start_x = x * 16 + 8;
             uint32_t start_y = y * 16 + 8;
             double norm = sqrt(mv_x * mv_x + mv_y + mv_y);

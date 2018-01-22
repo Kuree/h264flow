@@ -77,7 +77,7 @@ void init_op(py::module &m) {
 void init_model(py::module &m) {
     m.def("load_mv", &load_mv);
     m.def("dump_mv", &dump_mv);
-    m.def("create_mv", [](py::array_t<double> array) {
+    m.def("create_mv", [](py::array_t<float> array) {
         auto shape = array.shape();
         if (shape[2] != 2)
             throw std::runtime_error("array has to be a vector field");
@@ -87,8 +87,8 @@ void init_model(py::module &m) {
         MvFrame frame(width * 16, height * 16, width, height, false);
         for (uint32_t i = 0; i < height; i++) {
             for (uint32_t j = 0; j < width; j++) {
-                auto x = (int)matrix(i, j, 0);
-                auto y = (int)matrix(i, j, 1);
+                auto x = matrix(i, j, 0);
+                auto y = matrix(i, j, 1);
                 MotionVector mv {
                         x,
                         y,

@@ -35,7 +35,7 @@ private:
 };
 
 struct MotionVector {
-    int mvL0[2] = {0, 0};
+    float mvL0[2] = {0, 0};
     uint32_t x = 0;
     uint32_t y = 0;
     uint32_t energy = 0;
