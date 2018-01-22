@@ -23,15 +23,15 @@ class BitStream {
 public:
     explicit BitStream(std::string filename);
 
-    ~BitStream() { _stream.close(); }
+    ~BitStream() { stream_.close(); }
 
     std::vector<std::pair<uint64_t, uint64_t>> chunk_offsets()
-    { return _chunk_offsets; }
+    { return chunk_offsets_; }
 
     std::string extract_stream(uint64_t position, uint64_t size);
 private:
-    std::ifstream _stream;
-    std::vector<std::pair<uint64_t, uint64_t>> _chunk_offsets;
+    std::ifstream stream_;
+    std::vector<std::pair<uint64_t, uint64_t>> chunk_offsets_;
 };
 
 struct MotionVector {
@@ -46,33 +46,33 @@ public:
     explicit MvFrame(ParserContext &ctx);
     MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
             uint32_t mb_height, bool p_frame = false);
-    MvFrame() : _mvs() {}
+    MvFrame() : mvs_() {}
     MvFrame(const MvFrame& frame);
     MotionVector get_mv(uint32_t mb_addr) const;
     MotionVector get_mv(uint32_t x, uint32_t y) const;
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
-    { _mvs[y][x] = mv; }
+    { mvs_[y][x] = mv; }
     inline void set_mv(uint32_t mb_addr, MotionVector mv)
-    { _mvs[mb_addr / _mb_width][mb_addr % _mb_width] = mv; }
+    { mvs_[mb_addr / mb_width_][mb_addr % mb_width_] = mv; }
     inline std::vector<MotionVector> get_row(uint32_t row) const
-    { return _mvs[row]; }
+    { return mvs_[row]; }
 
-    inline uint32_t height() const { return _height; }
-    inline uint32_t width() const { return _width; }
-    inline uint32_t mb_height() const { return _mb_height; }
-    inline uint32_t mb_width() const { return _mb_width; }
+    inline uint32_t height() const { return height_; }
+    inline uint32_t width() const { return width_; }
+    inline uint32_t mb_height() const { return mb_height_; }
+    inline uint32_t mb_width() const { return mb_width_; }
 
-    inline std::vector<MotionVector>operator[](uint32_t y) { return _mvs[y]; }
+    inline std::vector<MotionVector>operator[](uint32_t y) { return mvs_[y]; }
 
-    inline bool p_frame() const { return _p_frame; }
+    inline bool p_frame() const { return p_frame_; }
 
 private:
-    uint32_t _height = 0;
-    uint32_t _width = 0;
-    uint32_t _mb_width = 0;
-    uint32_t _mb_height = 0;
-    std::vector<std::vector<MotionVector>> _mvs;
-    bool _p_frame = true;
+    uint32_t height_ = 0;
+    uint32_t width_ = 0;
+    uint32_t mb_width_ = 0;
+    uint32_t mb_height_ = 0;
+    std::vector<std::vector<MotionVector>> mvs_;
+    bool p_frame_ = true;
 };
 
 class h264 {
@@ -85,13 +85,13 @@ public:
     MvFrame load_frame(uint64_t frame_num);
     uint64_t index_size();
 private:
-    uint8_t _length_size = 4;
-    std::vector<uint64_t> _chunk_offsets;
-    std::shared_ptr<MP4File> _mp4 = nullptr;
-    std::shared_ptr<SPS_NALUnit> _sps = nullptr;
-    std::shared_ptr<PPS_NALUnit> _pps = nullptr;
-    std::shared_ptr<Box> _trak_box = nullptr;
-    std::shared_ptr<BitStream> _bit_stream = nullptr;
+    uint8_t length_size_ = 4;
+    std::vector<uint64_t> chunk_offsets_;
+    std::shared_ptr<MP4File> mp4_ = nullptr;
+    std::shared_ptr<SPS_NALUnit> sps_ = nullptr;
+    std::shared_ptr<PPS_NALUnit> pps_ = nullptr;
+    std::shared_ptr<Box> trak_box_ = nullptr;
+    std::shared_ptr<BitStream> bit_stream_ = nullptr;
 
     uint64_t read_nal_size(BinaryReader &br);
 

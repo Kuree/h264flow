@@ -23,61 +23,60 @@
 using std::shared_ptr;
 using std::runtime_error;
 
-BitStream::BitStream(std::string filename) : _stream(), _chunk_offsets() {
+BitStream::BitStream(std::string filename) : stream_(), chunk_offsets_() {
     if (!file_exists(filename))
         throw std::runtime_error(filename + " not found");
-    _stream.open(filename);
+    stream_.open(filename);
 
     /* index chunks */
-    BinaryReader br(_stream);
+    BinaryReader br(stream_);
     uint32_t tag_size = 3;
     if (!search_nal(br, true, tag_size))
         throw std::runtime_error("no nal unit found");
     uint64_t pos = br.pos();
     while (search_nal(br, true, tag_size)) {
         uint64_t size = br.pos() - pos - tag_size;
-        _chunk_offsets.emplace_back(std::make_pair<uint64_t, uint64_t>(
-                (uint64_t)pos, (uint64_t)size));
+        chunk_offsets_.emplace_back(std::make_pair(pos, size));
         pos = br.pos();
     }
     /* last one */
     uint64_t size = br.pos() - pos;
-    _chunk_offsets.emplace_back(std::make_pair<uint64_t, uint64_t>(
-            (uint64_t)pos, (uint64_t)size));
+    chunk_offsets_.emplace_back(std::make_pair(pos, size));
 }
 
 std::string BitStream::extract_stream(uint64_t position, uint64_t size) {
-    BinaryReader br(_stream);
+    BinaryReader br(stream_);
     br.seek(position);
     return br.read_bytes(size);
 }
 
-h264::h264(const std::string &filename) : _chunk_offsets() {
+h264::h264(const std::string &filename) : chunk_offsets_() {
     auto ext = file_extension(filename);
     if (ext == ".mp4") {
-        _mp4 = std::make_shared<MP4File>(filename);
+        mp4_ = std::make_shared<MP4File>(filename);
         load_mp4();
-    } else if(ext == ".264" || ext == ".h264") {
-        _bit_stream = std::make_shared<BitStream>(filename);
+    } else if (ext == ".264" || ext == ".h264") {
+        bit_stream_ = std::make_shared<BitStream>(filename);
         load_bitstream();
     } else {
         throw std::runtime_error("unsupported media file extension");
     }
 }
 
-h264::h264(std::shared_ptr<MP4File> mp4) : _chunk_offsets(), _mp4(std::move(mp4)) {
+h264::h264(std::shared_ptr<MP4File> mp4) : chunk_offsets_(),
+                                           mp4_(std::move(mp4)) {
     load_mp4();
 }
 
 void h264::load_mp4() {
-    if (!_mp4) throw std::runtime_error("mp4 is nullptr");
-    auto tracks = _mp4->find_all("trak");
+    if (!mp4_) throw std::runtime_error("mp4 is nullptr");
+    auto tracks = mp4_->find_all("trak");
     std::shared_ptr<Box> box = nullptr;
     for (const auto & track : tracks) {
         auto b = track->find_first("avc1");
         if (b) {
             box = b;
-            _trak_box = track;
+            trak_box_ = track;
             break;
         }
     }
@@ -90,29 +89,29 @@ void h264::load_mp4() {
         pps = pps_list[0];
         sps = sps_list[0]; /* use the first one */
 
-        _length_size = (uint8_t)(avc1.avcC().length_size_minus_one() + 1);
+        length_size_ = (uint8_t)(avc1.avcC().length_size_minus_one() + 1);
     }
     if (!pps || !sps)
         throw std::runtime_error("sps or pps not found in mp4 file");
-    _sps = sps;
-    _pps = pps;
+    sps_ = sps;
+    pps_ = pps;
 }
 
 void h264::index_nal() {
-    if (_bit_stream) return;
-    auto box = _trak_box->find_first("stco");
-    if (!box) box = _trak_box->find_first("co64");
+    if (bit_stream_) return;
+    auto box = trak_box_->find_first("stco");
+    if (!box) box = trak_box_->find_first("co64");
     if (!box) throw std::runtime_error("stco/co64 not found");
     StcoBox stco = StcoBox(*box.get());
-    box = _trak_box->find_first("stsc");
+    box = trak_box_->find_first("stsc");
     if (!box) throw std::runtime_error("stsc not found");
     StscBox stsc = StscBox(box);
-    box = _trak_box->find_first("stsz");
+    box = trak_box_->find_first("stsz");
     if (!box) throw std::runtime_error("stsz not found");
     StszBox stsz = StszBox(box);
 
     auto sample_entries = stsz.entries();
-    _chunk_offsets = std::vector<uint64_t>(sample_entries.size());
+    chunk_offsets_ = std::vector<uint64_t>(sample_entries.size());
     uint32_t chunk_count = 0;
     uint32_t stsc_index = 0;
     uint32_t samples_per_chunk = stsc.entries()[stsc_index].samples_per_chunk;
@@ -120,7 +119,7 @@ void h264::index_nal() {
     for (uint32_t i = 0; i < sample_entries.size(); i++) {
         uint32_t sample_size = sample_entries[i];
         uint64_t result = stco.chunk_offsets()[chunk_count] + in_chunk_offset;
-        _chunk_offsets[i] = result;
+        chunk_offsets_[i] = result;
         in_chunk_offset += sample_size;
 
         if (!samples_per_chunk) {
@@ -128,48 +127,49 @@ void h264::index_nal() {
             chunk_count++;
             in_chunk_offset = 0;
             if (stsc_index + 1 < stsc.entries().size()
-                && stsc.entries()[stsc_index + 1].first_chunk - 1 == chunk_count) {
+                && stsc.entries()[stsc_index + 1].first_chunk - 1
+                   == chunk_count) {
                 stsc_index++;
-                samples_per_chunk = stsc.entries()[stsc_index].samples_per_chunk;
+                samples_per_chunk =
+                        stsc.entries()[stsc_index].samples_per_chunk;
             }
         }
     }
-
 }
 
 h264::h264(std::shared_ptr<BitStream> stream)
-        : _chunk_offsets(), _bit_stream(std::move(stream)) {
+        : chunk_offsets_(), bit_stream_(std::move(stream)) {
     load_bitstream();
 }
 
 void h264::load_bitstream() {
-    for (const auto & pair : _bit_stream->chunk_offsets()) {
+    for (const auto & pair : bit_stream_->chunk_offsets()) {
         /* linear search. however, since most sps and pps are at the very
          * beginning, this is actually pretty fast
          */
-        std::string data = _bit_stream->extract_stream(pair.first, pair.second);
+        std::string data = bit_stream_->extract_stream(pair.first, pair.second);
         NALUnit unit(std::move(data));
         if (unit.nal_unit_type() == 7) {
-            _sps = std::make_shared<SPS_NALUnit>(unit);
+            sps_ = std::make_shared<SPS_NALUnit>(unit);
         } else if (unit.nal_unit_type() == 8) {
-            _pps = std::make_shared<PPS_NALUnit>(unit);
+            pps_ = std::make_shared<PPS_NALUnit>(unit);
         }
-        if (_sps && _pps)
+        if (sps_ && pps_)
             return;
     }
 }
 
 uint64_t h264::read_nal_size(BinaryReader &br) {
     uint32_t unit_size = 0;
-    if (_length_size == 4) {
+    if (length_size_ == 4) {
         unit_size = br.read_uint32();
-    } else if (_length_size == 3) {
+    } else if (length_size_ == 3) {
         uint32_t hi_byte = br.read_uint8();
         uint32_t low_bits = br.read_uint16();
         unit_size = hi_byte << 16 | low_bits;
-    } else if (_length_size == 2) {
+    } else if (length_size_ == 2) {
         unit_size = br.read_uint16();
-    } else if (_length_size == 1) {
+    } else if (length_size_ == 1) {
         unit_size = br.read_uint8();
     } else {
         throw std::runtime_error("unsupported length size");
@@ -178,36 +178,37 @@ uint64_t h264::read_nal_size(BinaryReader &br) {
 }
 
 uint64_t h264::index_size() {
-    if (_bit_stream) {
-        return _bit_stream->chunk_offsets().size();
+    if (bit_stream_) {
+        return bit_stream_->chunk_offsets().size();
     } else {
-        if (!_chunk_offsets.size())
+        if (chunk_offsets_.empty())
             index_nal();
-        return _chunk_offsets.size();
+        return chunk_offsets_.size();
     }
 }
 
 MvFrame h264::load_frame(uint64_t frame_num) {
     std::string nal_data;
-    if (_bit_stream) {
+    if (bit_stream_) {
         uint64_t pos, size;
-        std::tie(pos, size) = _bit_stream->chunk_offsets()[frame_num];
-        nal_data = _bit_stream->extract_stream(pos, size);
+        std::tie(pos, size) = bit_stream_->chunk_offsets()[frame_num];
+        nal_data = bit_stream_->extract_stream(pos, size);
     } else {
-        if (_chunk_offsets.empty())
+        if (chunk_offsets_.empty())
             index_nal();
-        uint64_t offset = _chunk_offsets[frame_num];
-        std::string size_string = _mp4->extract_stream(offset, _length_size);
+        uint64_t offset = chunk_offsets_[frame_num];
+        std::string size_string = mp4_->extract_stream(offset, length_size_);
         std::istringstream stream(size_string);
         BinaryReader br(stream);
         uint64_t unit_size = read_nal_size(br);
-        nal_data = _mp4->extract_stream(offset + _length_size,
+        nal_data = mp4_->extract_stream(offset + length_size_,
                                                     unit_size);
     }
-    ParserContext ctx(_sps, _pps);
+    ParserContext ctx(sps_, pps_);
     /* test the slice type */
-    if (!is_p_slice(nal_data[0]))
-        return MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,  ctx.Height() / 16, false);
+    if (!is_p_slice(static_cast<uint8_t>(nal_data[0])))
+        return MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,
+                       ctx.Height() / 16, false);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
 
@@ -238,10 +239,10 @@ void h264::process_inter_mb(ParserContext &ctx) {
             } else {
                 throw NotImplemented("numSubMbParts = 4");
             }
-            //uint64_t partWidthC = partWidth / ctx.SubWidthC();
-            //uint64_t partHeightC = partHeight / ctx.SubHeightC();
+            // uint64_t partWidthC = partWidth / ctx.SubWidthC();
+            // uint64_t partHeightC = partHeight / ctx.SubHeightC();
 
-            //uint64_t MvCnt = 0;
+            // uint64_t MvCnt = 0;
 
             int refIdxL0 = -1;
             int refIdxL1 = -1;
@@ -280,7 +281,8 @@ void h264::process_inter_mb(ParserContext &ctx) {
                     auto mb_pred_mode = MbPartPredMode(mb_type, mbPartIdx,
                                                        slice_type);
                     if (mb_pred_mode == Pred_L0 || mb_pred_mode == BiPred) {
-                        refIdxL0 = (int) mb->mb_pred->ref_idx_l0[mbPartIdx];
+                        refIdxL0 = static_cast<int>(
+                                mb->mb_pred->ref_idx_l0[mbPartIdx]);
                         predFlagL0 = true;
                     } else {
                         refIdxL0 = -1;
@@ -288,7 +290,8 @@ void h264::process_inter_mb(ParserContext &ctx) {
                     }
 
                     if (mb_pred_mode == Pred_L1 || mb_pred_mode == BiPred) {
-                        refIdxL1 = (int) mb->mb_pred->ref_idx_l1[mbPartIdx];
+                        refIdxL1 = static_cast<int>(
+                                mb->mb_pred->ref_idx_l1[mbPartIdx]);
                         predFlagL1 = true;
                     } else {
                         refIdxL1 = -1;
@@ -298,19 +301,23 @@ void h264::process_inter_mb(ParserContext &ctx) {
                     if (predFlagL0) {
                         int mvpL0[2] = {0, 0};
                         process_luma_mv(ctx, mbPartIdx, 0, mvpL0);
-                        mvL0[0] = (int) (mvpL0[0] +
-                                         mb->mb_pred->mvd_l0[mbPartIdx][subMbPartIdx][0]);
-                        mvL0[1] = (int) (mvpL0[1] +
-                                         mb->mb_pred->mvd_l0[mbPartIdx][subMbPartIdx][1]);
+                        mvL0[0] = static_cast<int>(
+                                mvpL0[0] + mb->mb_pred->mvd_l0[mbPartIdx]
+                                           [subMbPartIdx][0]);
+                        mvL0[1] =  static_cast<int>(
+                                mvpL0[1] + mb->mb_pred->mvd_l0[mbPartIdx]
+                                           [subMbPartIdx][1]);
                     }
 
                     if (predFlagL1) {
                         int mvpL1[2] = {0, 0};
                         process_luma_mv(ctx, mbPartIdx, 1, mvpL1);
-                        mvL1[0] = (int) (mvpL1[0] +
-                                         mb->mb_pred->mvd_l1[mbPartIdx][subMbPartIdx][0]);
-                        mvL1[1] = (int) (mvpL1[1] +
-                                         mb->mb_pred->mvd_l1[mbPartIdx][subMbPartIdx][1]);
+                        mvL1[0] = static_cast<int>(
+                                mvpL1[0] + mb->mb_pred->mvd_l1[mbPartIdx]
+                                           [subMbPartIdx][0]);
+                        mvL1[1] = static_cast<int>(
+                                mvpL1[1] + mb->mb_pred->mvd_l1[mbPartIdx]
+                                           [subMbPartIdx][1]);
                     }
                 }
                 mb->mvL[0][mbPartIdx][subMbPartIdx][0] = mvL0[0];
@@ -326,9 +333,9 @@ void h264::process_inter_mb(ParserContext &ctx) {
     }
 }
 
-void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mvLA)[2],
-                                int (&mvLB)[2], int (&mvLC)[2], int &refIdxLA,
-                                int &refIdxLB, int &refIdxLC) {
+void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag,
+                                int (&mvLA)[2], int (&mvLB)[2], int (&mvLC)[2],
+                                int &refIdxLA, int &refIdxLB, int &refIdxLC) {
     int64_t mbAddrA = ctx.mb->mbAddrA;
     int64_t mbAddrB = ctx.mb->mbAddrB;
     int64_t mbAddrC = ctx.mb->mbAddrC;
@@ -339,8 +346,9 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
 
     uint64_t slice_type = ctx.header()->slice_type;
 
-    if (mbAddrA == -1 || is_mb_intra(ctx.mb_array[mbAddrA]->mb_type, slice_type) ||
-            ctx.mb_array[mbAddrA]->predFlagL[listSuffixFlag][mbPartIdxA] == 0) {
+    if (mbAddrA == -1
+        || is_mb_intra(ctx.mb_array[mbAddrA]->mb_type, slice_type)
+        || ctx.mb_array[mbAddrA]->predFlagL[listSuffixFlag][mbPartIdxA] == 0) {
         mvLA[0] = 0; mvLA[1] = 0;
         refIdxLA = -1;
     } else {
@@ -349,8 +357,9 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
         refIdxLA = ctx.mb_array[mbAddrA]->refIdxL[listSuffixFlag][mbPartIdxA];
     }
 
-    if (mbAddrB == -1 || is_mb_intra(ctx.mb_array[mbAddrB]->mb_type, slice_type) ||
-        ctx.mb_array[mbAddrB]->predFlagL[listSuffixFlag][mbPartIdxB] == 0) {
+    if (mbAddrB == -1
+        || is_mb_intra(ctx.mb_array[mbAddrB]->mb_type, slice_type)
+        || ctx.mb_array[mbAddrB]->predFlagL[listSuffixFlag][mbPartIdxB] == 0) {
         mvLB[0] = 0; mvLB[1] = 0;
         refIdxLB = -1;
     } else {
@@ -359,8 +368,9 @@ void h264::get_mv_neighbor_part(ParserContext &ctx, int listSuffixFlag, int (&mv
         refIdxLB = ctx.mb_array[mbAddrB]->refIdxL[listSuffixFlag][mbPartIdxB];
     }
 
-    if (mbAddrC == -1 || is_mb_intra(ctx.mb_array[mbAddrC]->mb_type, slice_type) ||
-        ctx.mb_array[mbAddrC]->predFlagL[listSuffixFlag][mbPartIdxC] == 0) {
+    if (mbAddrC == -1
+        || is_mb_intra(ctx.mb_array[mbAddrC]->mb_type, slice_type)
+        || ctx.mb_array[mbAddrC]->predFlagL[listSuffixFlag][mbPartIdxC] == 0) {
         mvLC[0] = 0; mvLC[1] = 0;
         refIdxLC = -1;
     } else {
@@ -383,12 +393,12 @@ void h264::process_luma_mv(ParserContext &ctx, uint32_t mbPartIdx,
                          refIdxLA, refIdxLB, refIdxLC);
     process_luma_mv(ctx, mbPartIdx, mvL0A, mvL0B, mvL0C, refIdxLA,
                     refIdxLB, refIdxLC, mvL);
-
 }
 
-void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2],
-                           int (mvLB)[2], int (mvLC)[2], int refIdxLA,
-                           int refIdxLB, int refIdxLC, int (&mvL)[2]) {
+void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx,
+                           int (mvLA)[2], int (mvLB)[2], int (mvLC)[2],
+                           int refIdxLA, int refIdxLB, int refIdxLC,
+                           int (&mvL)[2]) {
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     uint64_t mbPartWidth = MbPartWidth(mb->mb_type);
     uint64_t mbPartHeight = MbPartHeight(mb->mb_type);
@@ -402,13 +412,13 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
         mvL[0] = mvLC[0]; mvL[1] = mvLC[1];
     } else {
         /* 8.4.1.3.1*/
-        if (refIdxLA != -1 and refIdxLB == -1 and refIdxLC == -1) {
+        if (refIdxLA != -1 && refIdxLB == -1 && refIdxLC == -1) {
             mvL[0] = mvLA[0];
             mvL[1] = mvLA[1];
-        } else if (refIdxLA == -1 and refIdxLB != -1 and refIdxLC == -1) {
+        } else if (refIdxLA == -1 && refIdxLB != -1 && refIdxLC == -1) {
             mvL[0] = mvLB[0];
             mvL[1] = mvLB[1];
-        } else if (refIdxLA == -1 and refIdxLB == -1 and refIdxLC != -1) {
+        } else if (refIdxLA == -1 && refIdxLB == -1 && refIdxLC != -1) {
             mvL[0] = mvLC[0];
             mvL[1] = mvLC[1];
         } else {
@@ -420,17 +430,17 @@ void h264::process_luma_mv(ParserContext &ctx,  uint32_t mbPartIdx, int (mvLA)[2
     }
 }
 
-MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
-    _height = ctx.Height();
-    _width = ctx.Width();
-    _mb_width = (uint32_t)ctx.PicWidthInMbs();
-    _mb_height = (uint32_t)ctx.PicHeightInMapUnits();
-    _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
-                                                  std::vector<MotionVector>(_mb_width));
-    for (uint32_t i = 0; i < _mb_height; i++) {
-        for (uint32_t j = 0; j < _mb_width; j++) {
+MvFrame::MvFrame(ParserContext &ctx) : mvs_() {
+    height_ = ctx.Height();
+    width_ = ctx.Width();
+    mb_width_ = (uint32_t)ctx.PicWidthInMbs();
+    mb_height_ = (uint32_t)ctx.PicHeightInMapUnits();
+    mvs_ = std::vector<std::vector<MotionVector>>(
+            mb_height_, std::vector<MotionVector>(mb_width_));
+    for (uint32_t i = 0; i < mb_height_; i++) {
+        for (uint32_t j = 0; j < mb_width_; j++) {
             /* compute mb_addr */
-            uint32_t mb_addr = i * _mb_width + j;
+            uint32_t mb_addr = i * mb_width_ + j;
             std::shared_ptr<MacroBlock> mb = ctx.mb_array[mb_addr];
             if (mb->pos_x() != j || mb->pos_y() != i)
                 throw std::runtime_error("pos does not match");
@@ -442,48 +452,47 @@ MvFrame::MvFrame(ParserContext &ctx) : _mvs() {
             };
             mv.energy = uint32_t(mv.mvL0[0] * mv.mvL0[0] +
                                          mv.mvL0[1] * mv.mvL0[1]);
-            _mvs[i][j] = mv;
+            mvs_[i][j] = mv;
         }
     }
 }
 
-MvFrame::MvFrame(const MvFrame &frame) : _height(frame._height),
-                                         _width(frame._width),
-                                         _mb_width(frame._mb_width),
-                                         _mb_height(frame._mb_height), _mvs() {
-    _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
-                                                  std::vector<MotionVector>(_mb_width));
+MvFrame::MvFrame(const MvFrame &frame) : height_(frame.height_),
+                                         width_(frame.width_),
+                                         mb_width_(frame.mb_width_),
+                                         mb_height_(frame.mb_height_), mvs_() {
+    mvs_ = std::vector<std::vector<MotionVector>>(
+            mb_height_, std::vector<MotionVector>(mb_width_));
 
-    for (uint32_t i = 0; i < _mb_height; i++) {
-        for (uint32_t j = 0; j < _mb_width; j++) {
-            _mvs[i][j] = frame._mvs[i][j];
+    for (uint32_t i = 0; i < mb_height_; i++) {
+        for (uint32_t j = 0; j < mb_width_; j++) {
+            mvs_[i][j] = frame.mvs_[i][j];
         }
     }
-
 }
 
 MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
                  uint32_t mb_height, bool p_frame)
-        : _height(pic_height), _width(pic_width), _mb_width(mb_width),
-          _mb_height(mb_height), _mvs(), _p_frame(p_frame) {
-    _mvs = std::vector<std::vector<MotionVector>>(_mb_height,
-                                                  std::vector<MotionVector>(_mb_width));
-    for (uint32_t i = 0; i < _mb_height; i++) {
-        for (uint32_t j = 0; j < _mb_width; j++) {
+        : height_(pic_height), width_(pic_width), mb_width_(mb_width),
+          mb_height_(mb_height), mvs_(), p_frame_(p_frame) {
+    mvs_ = std::vector<std::vector<MotionVector>>(
+            mb_height_, std::vector<MotionVector>(mb_width_));
+    for (uint32_t i = 0; i < mb_height_; i++) {
+        for (uint32_t j = 0; j < mb_width_; j++) {
             MotionVector mv;
             mv.x = j;
             mv.y = i;
-            _mvs[i][j] = mv;
+            mvs_[i][j] = mv;
         }
     }
 }
 
 MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) const {
-    return _mvs[y][x];
+    return mvs_[y][x];
 }
 
 MotionVector MvFrame::get_mv(uint32_t mb_addr) const {
-    uint32_t j = mb_addr % _mb_width;
-    uint32_t i = mb_addr / _mb_width;
-    return _mvs[i][j];
+    uint32_t j = mb_addr % mb_width_;
+    uint32_t i = mb_addr / mb_width_;
+    return mvs_[i][j];
 }

@@ -67,109 +67,110 @@ void SPS_NALUnit::parse() {
     std::stringstream stream(_data);
     BinaryReader br(stream);
 
-    _profile_idc = br.read_uint8();
-    _flags = br.read_uint8();
-    _level_idc = br.read_uint8();
-    _sps_id = br.read_ue();
-    if( _profile_idc == 100 || _profile_idc == 110 || _profile_idc == 122 ||
-        _profile_idc == 244 || _profile_idc == 44 || _profile_idc ==  83 ||
-        _profile_idc == 86 || _profile_idc == 118 || _profile_idc == 128) {
-        _chroma_format_idc = br.read_ue();
-        if (_chroma_format_idc == 3)
-            _separate_colour_plane_flag = br.read_bit(); /* 3 -> 4:4:4 */
+    profile_idc_ = br.read_uint8();
+    flags_ = br.read_uint8();
+    level_idc_ = br.read_uint8();
+    sps_id_ = br.read_ue();
+    if (profile_idc_ == 100 || profile_idc_ == 110 || profile_idc_ == 122 ||
+        profile_idc_ == 244 || profile_idc_ == 44 || profile_idc_ ==  83 ||
+        profile_idc_ == 86 || profile_idc_ == 118 || profile_idc_ == 128) {
+        chroma_format_idc_ = br.read_ue();
+        if (chroma_format_idc_ == 3)
+            separate_colour_plane_flag_ = br.read_bit(); /* 3 -> 4:4:4 */
         else
-            _separate_colour_plane_flag = false; /* 1->4:2:0    2-> 4:2:2 */
+            separate_colour_plane_flag_ = false; /* 1->4:2:0    2-> 4:2:2 */
 
 
-        _bit_depth_luma_minus8 = br.read_ue();
-        _bit_depth_chroma_minus8 = br.read_ue();
-        _qpprime_y_zero_transform_bypass_flag = br.read_bit_as_bool();
-        _seq_scaling_matrix_present_flag = br.read_bit_as_bool();
-        if (_seq_scaling_matrix_present_flag)
+        bit_depth_luma_minus8_ = br.read_ue();
+        bit_depth_chroma_minus8_ = br.read_ue();
+        qpprime_y_zero_transform_bypass_flag_ = br.read_bit_as_bool();
+        seq_scaling_matrix_present_flag_ = br.read_bit_as_bool();
+        if (seq_scaling_matrix_present_flag_)
             throw NotImplemented("seq_scaling_matrix_present_flag");
     }
-    _log2_max_frame_num_minus4 = br.read_ue();
-    _pic_order_cnt_type = br.read_ue();
-    if (_pic_order_cnt_type == 0) {
-        _log2_max_pic_order_cnt_lsb_minus4 = br.read_ue();
-    } else if (_pic_order_cnt_type == 1) {
-        _delta_pic_order_always_zero_flag = br.read_bit_as_bool();
-        _offset_for_non_ref_pic = br.read_se();
-        _offset_for_top_to_bottom_field = br.read_se();
-        _num_ref_frames_in_pic_order_cnt_cycle = br.read_ue();
-        for (uint32_t i = 0 ; i < _num_ref_frames_in_pic_order_cnt_cycle; i++)
-            _offset_for_ref_frame.emplace_back(br.read_se());
+    log2_max_frame_num_minus4_ = br.read_ue();
+    pic_order_cnt_type_ = br.read_ue();
+    if (pic_order_cnt_type_ == 0) {
+        log2_max_pic_order_cnt_lsb_minus4_ = br.read_ue();
+    } else if (pic_order_cnt_type_ == 1) {
+        delta_pic_order_always_zero_flag_ = br.read_bit_as_bool();
+        offset_for_non_ref_pic_ = br.read_se();
+        offset_for_top_to_bottom_field_ = br.read_se();
+        num_ref_frames_in_pic_order_cnt_cycle_ = br.read_ue();
+        for (uint32_t i = 0 ; i < num_ref_frames_in_pic_order_cnt_cycle_; i++)
+            offset_for_ref_frame_.emplace_back(br.read_se());
     }
-    _max_num_ref_frames = br.read_ue();
-    _gaps_in_frame_num_value_allowed_flag = br.read_bit_as_bool();
-    _pic_width_in_mbs_minus1 = br.read_ue();
-    _pic_height_in_map_units_minus1 = br.read_ue();
-    _frame_mbs_only_flag = br.read_bit_as_bool();
-    if (!_frame_mbs_only_flag)
-        _mb_adaptive_frame_field_flag = br.read_bit_as_bool();
-    _direct_8x8_inference_flag = br.read_bit_as_bool();
-    _frame_cropping_flag = br.read_bit_as_bool();
-    if (_frame_cropping_flag) {
-        _frame_crop_left_offset = br.read_ue();
-        _frame_crop_right_offset = br.read_ue();
-        _frame_crop_top_offset = br.read_ue();
-        _frame_crop_bottom_offset = br.read_ue();
+    max_num_ref_frames_ = br.read_ue();
+    gaps_in_frame_num_value_allowed_flag_ = br.read_bit_as_bool();
+    pic_width_in_mbs_minus1_ = br.read_ue();
+    pic_height_in_map_units_minus1_ = br.read_ue();
+    frame_mbs_only_flag_ = br.read_bit_as_bool();
+    if (!frame_mbs_only_flag_)
+        mb_adaptive_frame_field_flag_ = br.read_bit_as_bool();
+    direct_8x8_inference_flag_ = br.read_bit_as_bool();
+    frame_cropping_flag_ = br.read_bit_as_bool();
+    if (frame_cropping_flag_) {
+        frame_crop_left_offset_ = br.read_ue();
+        frame_crop_right_offset_ = br.read_ue();
+        frame_crop_top_offset_ = br.read_ue();
+        frame_crop_bottom_offset_ = br.read_ue();
     }
 
-    _vui_parameters_present_flag = br.read_bit_as_bool();
-    if (_vui_parameters_present_flag) {
+    vui_parameters_present_flag_ = br.read_bit_as_bool();
+    if (vui_parameters_present_flag_) {
         // not parsed yet
     }
 }
 
 SPS_NALUnit::SPS_NALUnit(std::string data) : NALUnit(std::move(data)),
-                                             _offset_for_ref_frame() {
+                                             offset_for_ref_frame_() {
     parse();
 }
 
 SPS_NALUnit::SPS_NALUnit(NALUnit & unit) : NALUnit(unit),
-                                           _offset_for_ref_frame() {
+                                           offset_for_ref_frame_() {
     parse();
 }
 
-PPS_NALUnit::PPS_NALUnit(std::string data) : NALUnit(std::move(data)), _run_length_minus1(),
-                                             _top_left(), _bottom_right(),
-                                             _slice_group_id(){
+PPS_NALUnit::PPS_NALUnit(std::string data) : NALUnit(std::move(data)),
+                                             run_length_minus1_(),
+                                             top_left_(), bottom_right_(),
+                                             slice_group_id_() {
     parse();
 }
 
-PPS_NALUnit::PPS_NALUnit(NALUnit &unit) : NALUnit(unit) , _run_length_minus1(),
-                                          _top_left(), _bottom_right(),
-                                          _slice_group_id(){
+PPS_NALUnit::PPS_NALUnit(NALUnit &unit) : NALUnit(unit) , run_length_minus1_(),
+                                          top_left_(), bottom_right_(),
+                                          slice_group_id_() {
     parse();
 }
 
 void PPS_NALUnit::parse() {
     BitReader br(_data);
 
-    _pps_id = br.read_ue();
-    _sps_id = br.read_ue();
-    _entropy_coding_mode_flag = br.read_bit_as_bool();
-    if (_entropy_coding_mode_flag)
+    pps_id_ = br.read_ue();
+    sps_id_ = br.read_ue();
+    entropy_coding_mode_flag_ = br.read_bit_as_bool();
+    if (entropy_coding_mode_flag_)
         throw NotImplemented("entropy_coding_mode_flag");
-    _bottom_field_pic_order_in_frame_present_flag = br.read_bit_as_bool();
-    _num_slice_groups_minus1 = br.read_ue();
-    if (_num_slice_groups_minus1 > 0) {
-        _slice_group_map_type = br.read_ue();
-        if (_slice_group_map_type == 0) {
-            for (uint64_t i = 0; i <= _num_slice_groups_minus1; i++) {
-                _run_length_minus1.emplace_back(br.read_ue());
+    bottom_field_pic_order_in_frame_present_flag_ = br.read_bit_as_bool();
+    num_slice_groups_minus1_ = br.read_ue();
+    if (num_slice_groups_minus1_ > 0) {
+        slice_group_map_type_ = br.read_ue();
+        if (slice_group_map_type_ == 0) {
+            for (uint64_t i = 0; i <= num_slice_groups_minus1_; i++) {
+                run_length_minus1_.emplace_back(br.read_ue());
             }
-        } else if (_slice_group_map_type == 2) {
-            for (uint64_t i = 0; i <= _num_slice_groups_minus1; i++) {
-                _top_left.emplace_back(br.read_ue());
-                _bottom_right.emplace_back(br.read_ue());
+        } else if (slice_group_map_type_ == 2) {
+            for (uint64_t i = 0; i <= num_slice_groups_minus1_; i++) {
+                top_left_.emplace_back(br.read_ue());
+                bottom_right_.emplace_back(br.read_ue());
             }
-        } else if (_slice_group_map_type == 3 || _slice_group_map_type == 4 ||
-                   _slice_group_map_type == 5 || _slice_group_map_type == 6) {
-            _slice_group_change_direction_flag = br.read_bit_as_bool();
-            _slice_group_change_rate_minus1 = br.read_ue();
-        } else if (_slice_group_map_type == 6) {
+        } else if (slice_group_map_type_ == 3 || slice_group_map_type_ == 4 ||
+                   slice_group_map_type_ == 5 || slice_group_map_type_ == 6) {
+            slice_group_change_direction_flag_ = br.read_bit_as_bool();
+            slice_group_change_rate_minus1_ = br.read_ue();
+        } else if (slice_group_map_type_ == 6) {
             /* this requires pps input, currently not supported */
             throw NotImplemented("_slice_group_map_type == 6");
             // pic_size_in_map_units_minus1 = br.read_ue();
@@ -178,24 +179,17 @@ void PPS_NALUnit::parse() {
             // }
         }
     }
-    _num_ref_idx_l0_default_active_minus1 = br.read_ue();
-    _num_ref_idx_l1_default_active_minus1 = br.read_ue();
-    _weighted_pred_flag = br.read_bit_as_bool();
-    _weighted_bipred_idc = br.read_bits(2);
-    _pic_init_qp_minus26 = br.read_se();
-    _pic_init_qs_minus26 = br.read_se();
-    _chroma_qp_index_offset = br.read_se();
-    _deblocking_filter_control_present_flag = br.read_bit_as_bool();
-    _constrained_intra_pred_flag = br.read_bit_as_bool();
-    _redundant_pic_cnt_present_flag = br.read_bit_as_bool();
-    //if (!br.eof()) {
-        //_transform_8x8_mode_flag = br.read_bit_as_bool();
-        //_pic_scaling_matrix_present_flag = br.read_bit_as_bool();
-        //if (_pic_scaling_matrix_present_flag)
-        //    throw NotImplemented("pic_scaling_matrix_present_flag");
-        /* the rest is not parsed */
-    //}
-
+    num_ref_idx_l0_default_active_minus1_ = br.read_ue();
+    num_ref_idx_l1_default_active_minus1_ = br.read_ue();
+    weighted_pred_flag_ = br.read_bit_as_bool();
+    weighted_bipred_idc_ = br.read_bits(2);
+    pic_init_qp_minus26_ = br.read_se();
+    pic_init_qs_minus26_ = br.read_se();
+    chroma_qp_index_offset_ = br.read_se();
+    deblocking_filter_control_present_flag_ = br.read_bit_as_bool();
+    constrained_intra_pred_flag_ = br.read_bit_as_bool();
+    redundant_pic_cnt_present_flag_ = br.read_bit_as_bool();
+    /* the rest is not parsed */
 }
 
 Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)) {
@@ -204,7 +198,6 @@ Slice_NALUnit::Slice_NALUnit(std::string data) : NALUnit(std::move(data)) {
 }
 
 Slice_NALUnit::Slice_NALUnit(NALUnit &unit) : NALUnit(unit) {
-
     _header = std::make_shared<SliceHeader>(*this, _data);
     _slice_data = std::make_shared<SliceData>(*this);
 }
@@ -232,7 +225,7 @@ void SliceHeader::parse(ParserContext &ctx, BitReader &br) {
     if (sps->separate_colour_plane_flag())
         colour_plane_id = static_cast<uint8_t >(br.read_bits(2));
     frame_num = br.read_bits(sps->log2_max_frame_num_minus4() + 4);
-    if(!sps->frame_mbs_only_flag()) {
+    if (!sps->frame_mbs_only_flag()) {
         field_pic_flag = br.read_bit_as_bool();
         if (field_pic_flag)
             bottom_field_flag = br.read_bit_as_bool();
@@ -379,7 +372,7 @@ PredWeightTable::PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
         if (sps->chroma_array_type()) {
             bool chroma_weight_l0_flag = br.read_bit_as_bool();
             if (chroma_weight_l0_flag) {
-                for (int j = 0; j < 2; j++){
+                for (int j = 0; j < 2; j++) {
                     chroma_weight_l0[i][j] = br.read_se();
                     chroma_offset_l0[i][j] = br.read_se();
                 }
@@ -397,7 +390,7 @@ PredWeightTable::PredWeightTable(std::shared_ptr<SPS_NALUnit> sps,
             if (sps->chroma_array_type()) {
                 bool chroma_weight_l1_flag = br.read_bit_as_bool();
                 if (chroma_weight_l1_flag) {
-                    for (int j = 0; j < 2; j++){
+                    for (int j = 0; j < 2; j++) {
                         chroma_weight_l1[i][j] = br.read_se();
                         chroma_offset_l1[i][j] = br.read_se();
                     }
@@ -479,11 +472,11 @@ void SliceData::parse(ParserContext & ctx, BitReader &br) {
             if (!pps->entropy_coding_mode_flag()) {
                 mb_skip_run = br.read_ue();
                 prev_mb_skipped = mb_skip_run > 0;
-                for (uint64_t i = 0; i < mb_skip_run; i++ ) {
+                for (uint64_t i = 0; i < mb_skip_run; i++) {
                     std::shared_ptr<MacroBlock> block = make_shared<MacroBlock>
                             (ctx, false, curr_mb_addr);
                     ctx.mb_array[curr_mb_addr++] = block;
-                    //curr_mb_addr = next_mb_addr(curr_mb_addr, ctx);
+                    // curr_mb_addr = next_mb_addr(curr_mb_addr, ctx);
                 }
                 if (mb_skip_run > 0)
                     more_data_flag = more_rbsp_data(br);
@@ -509,7 +502,7 @@ void SliceData::parse(ParserContext & ctx, BitReader &br) {
         } else {
             throw NotImplemented("entropy_coding_mode_flag");
         }
-        //curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
+        // curr_mb_addr = next_mb_addr(curr_mb_addr,ctx);
     } while (more_data_flag);
     /* sanity check */
     if (curr_mb_addr != ctx.PicSizeInMbs())
@@ -517,15 +510,16 @@ void SliceData::parse(ParserContext & ctx, BitReader &br) {
 }
 
 uint64_t SliceData::next_mb_addr(uint64_t n, ParserContext &) {
-    //std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
-    //std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
-    //std::shared_ptr<SliceHeader> header = ctx.header();
+    // std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
+    // std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
+    // std::shared_ptr<SliceHeader> header = ctx.header();
     /* Based on eqn 7-24 -> 7-28 and 8-16 */
-    //uint64_t i = n + 1;
-    //std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
-    // while (i < ctx.PicSizeInMbs() && MbToSliceGroupMap[i] != MbToSliceGroupMap[n])
+    // uint64_t i = n + 1;
+    // std::vector<uint64_t> MbToSliceGroupMap = slice_group_map(sps, pps);
+    // while (i < ctx.PicSizeInMbs() && MbToSliceGroupMap[i] !=
+    // MbToSliceGroupMap[n])
     //    i++;
-    //return i;
+    // return i;
     return n + 1;
 }
 
@@ -560,9 +554,10 @@ std::vector<uint64_t> SliceData::slice_group_map(
                     (((i / PicWidthInMbs) * num_slice_groups) / 2))
                                         % num_slice_groups;
     } else if (pps->slice_group_map_type() == 2) {
-        for( i = 0; i < PicSizeInMapUnits; i++ )
+        for (i = 0; i < PicSizeInMapUnits; i++)
             mapUnitToSliceGroupMap[i] = num_slice_groups - 1;
-        for (int iGroup = (int)num_slice_groups - 2; iGroup >= 0; iGroup--) {
+        for (int iGroup = static_cast<int>(num_slice_groups) - 2;
+             iGroup >= 0; iGroup--) {
             uint64_t yTopLeft = pps->top_left()[iGroup] / PicWidthInMbs;
             uint64_t xTopLeft = pps->top_left()[iGroup] % PicWidthInMbs;
             uint64_t yBottomRight = pps->bottom_right()[iGroup] / PicWidthInMbs;
@@ -574,7 +569,6 @@ std::vector<uint64_t> SliceData::slice_group_map(
         }
     }
     return mapUnitToSliceGroupMap;
-
 }
 
 MacroBlock::MacroBlock(bool mb_field_decoding_flag, uint64_t curr_mb_addr)
@@ -628,7 +622,7 @@ void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
             && NumMbPart(mb_type) == 4) {
             SubMbPred sub_mb_pred;
             sub_mb_pred.parse(ctx, br);
-            for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++ ) {
+            for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
                 if (sub_mb_pred.sub_mb_type[mbPartIdx] != B_Direct_8x8)
                     noSubMbPartSizeLessThan8x8Flag = false;
                 else if (!sps->direct_8x8_inference_flag())
@@ -650,7 +644,8 @@ void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
             uint64_t coded_block_pattern = br.read_ue();
             if (coded_block_pattern > 47)
                 throw std::runtime_error("incorrect coded block pattern");
-            coded_block_pattern = MbPartPredMode(mb_type, 0, header->slice_type) == Intra_4x4?
+            coded_block_pattern = MbPartPredMode(mb_type, 0, header->slice_type)
+                                  == Intra_4x4?
                     codeNum_to_coded_block_pattern_intra[coded_block_pattern] :
                                   codeNum_to_coded_block_pattern_inter[
                                           coded_block_pattern];
@@ -664,7 +659,7 @@ void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
                  || sps->direct_8x8_inference_flag())) {
                 transform_size_8x8_flag = br.read_bit_as_bool();
             }
-        } else if (header->slice_type == SliceType::TYPE_I && mb_type > 4){
+        } else if (header->slice_type == SliceType::TYPE_I && mb_type > 4) {
             /* TODO: this is only a temporary fix. clean this up */
             if (mb_type > 12) {
                 CodedBlockPatternLuma = 15;
@@ -680,7 +675,7 @@ void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
             }
         }
 
-        uint64_t mb_part = MbPartPredMode(mb_type, 0, header->slice_type);
+        int mb_part = MbPartPredMode(mb_type, 0, header->slice_type);
         bool is_intra = mb_part == Intra_16x16 || Intra_4x4;
         if (CodedBlockPatternLuma > 0 || CodedBlockPatternChroma > 0 ||
                 is_intra) {
@@ -689,7 +684,6 @@ void MacroBlock::parse(ParserContext & ctx, BitReader &br) {
             residual = std::make_unique<Residual>(0, 15);
             residual->parse(ctx, br);
         }
-
     }
     /* based on mb_type */
     compute_mb_index(ctx);
@@ -710,13 +704,15 @@ void MacroBlock::compute_mb_neighbours(ParserContext &ctx) {
     if (mb_addr >= PicWidthInMbs &&
         (mb_addr + 1) % PicWidthInMbs != 0) {
         mbAddrC = mb_addr - PicWidthInMbs + 1;
-    } else
+    } else {
         mbAddrC = -1;
+    }
     if (mb_addr > PicWidthInMbs &&
         mb_addr % PicWidthInMbs != 0) {
         mbAddrD = mb_addr - PicWidthInMbs - 1;
-    } else
+    } else {
         mbAddrD = -1;
+    }
     /* will be overridden for non-skipped mb */
     compute_mb_index(ctx);
 }
@@ -724,8 +720,8 @@ void MacroBlock::compute_mb_neighbours(ParserContext &ctx) {
 void MacroBlock::compute_mb_index(ParserContext &ctx) {
     /* compute MbPartIdx table */
     uint64_t numMbPart = NumMbPart(mb_type);
-    //if (numMbPart == 4)
-    //    throw NotImplemented("numMbPart == 4");
+    // if (numMbPart == 4)
+    //     throw NotImplemented("numMbPart == 4");
     for (uint32_t mbPartIdx = 0; mbPartIdx < numMbPart; mbPartIdx++) {
         int x = 0; int y = 0;
         if (numMbPart == 2) {
@@ -770,8 +766,9 @@ void MacroBlock::assign_pos(ParserContext & ctx) {
     if (mb_addr <= (PicWidthInMbs * FrameHeightInMbs)) {
         _pos_x = mb_addr % PicWidthInMbs;
         _pos_y = mb_addr / PicWidthInMbs;
-    } else
+    } else {
         throw std::runtime_error("mb_addr out of range");
+    }
 }
 
 MbPred::MbPred() {
@@ -786,8 +783,8 @@ void MbPred::parse(ParserContext &ctx, BitReader &br) {
     std::shared_ptr<PPS_NALUnit> pps = ctx.pps;
     std::shared_ptr<SliceHeader> header = ctx.header();
     std::shared_ptr<MacroBlock> mb = ctx.mb;
-    uint32_t type = (uint32_t) MbPartPredMode(mb->mb_type, 0,
-                                              header->slice_type);
+    auto type = (uint32_t) MbPartPredMode(mb->mb_type, 0, header->slice_type);
+
     /* TODO: Intra_8x8 is not implemented */
     if (type == Intra_4x4 || type == Intra_16x16) {
         if (type == Intra_4x4) {
@@ -802,33 +799,42 @@ void MbPred::parse(ParserContext &ctx, BitReader &br) {
         }
         if (sps->chroma_array_type() == 1 || sps->chroma_array_type() == 2)
             intra_chroma_pred_mode = br.read_ue();
-    } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) != Direct){
+    } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) != Direct) {
         uint64_t num_mb_part = NumMbPart(mb->mb_type);
         uint64_t range_te0 = header->num_ref_idx_l0_active_minus1 + 1;
         uint64_t range_te1 = header->num_ref_idx_l1_active_minus1 + 1;
         for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
             if ((range_te0 > 1 ||
-                  mb->mb_field_decoding_flag != header->field_pic_flag ) &&
+                    mb->mb_field_decoding_flag != header->field_pic_flag) &&
                 MbPartPredMode(mb->mb_type, mbPartIdx,
                                header->slice_type) != Pred_L1)
             ref_idx_l0[mbPartIdx] = br.read_te(range_te0);
         }
 
-        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
+        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
             if ((range_te1 > 1 ||
-                  mb->mb_field_decoding_flag != header->field_pic_flag ) &&
-                MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0)
+                 mb->mb_field_decoding_flag != header->field_pic_flag) &&
+                MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) !=
+                Pred_L0)
                 ref_idx_l1[mbPartIdx] = br.read_te(range_te1);
+        }
 
-        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++)
-            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L1 )
-                for (int compIdx = 0; compIdx < 2; compIdx++ )
+        for (uint32_t mbPartIdx = 0; mbPartIdx < num_mb_part; mbPartIdx++) {
+            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) !=
+                Pred_L1) {
+                for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l0[mbPartIdx][0][compIdx] = br.read_se();
+            }
+        }
 
-        for (uint32_t mbPartIdx = 0; mbPartIdx < NumMbPart(mb->mb_type); mbPartIdx++)
-            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) != Pred_L0 )
-                for (int compIdx = 0; compIdx < 2; compIdx++ )
+        for (uint32_t mbPartIdx = 0; mbPartIdx < NumMbPart(mb->mb_type);
+             mbPartIdx++) {
+            if (MbPartPredMode(mb->mb_type, mbPartIdx, header->slice_type) !=
+                Pred_L0) {
+                for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l1[mbPartIdx][0][compIdx] = br.read_se();
+            }
+        }
     }
 }
 
@@ -864,25 +870,29 @@ void SubMbPred::parse(ParserContext &ctx, BitReader &br) {
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
         if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type) != Pred_L1)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
+            != Pred_L1) {
             for (uint32_t subMbPartIdx = 0; subMbPartIdx <
-                                       NumSubMbPart(sub_mb_type[mbPartIdx],
-                                                    header->slice_type);
+                                            NumSubMbPart(sub_mb_type[mbPartIdx],
+                                                         header->slice_type);
                  subMbPartIdx++) {
                 for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l0[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
             }
+        }
     }
     for (int mbPartIdx = 0; mbPartIdx < 4; mbPartIdx++) {
         if (sub_mb_type[mbPartIdx] != B_Direct_8x8 &&
-            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type) != Pred_L0)
+            SubMbPredMode(sub_mb_type[mbPartIdx], header->slice_type)
+            != Pred_L0) {
             for (uint32_t subMbPartIdx = 0; subMbPartIdx <
-                                       NumSubMbPart(sub_mb_type[mbPartIdx],
-                                                    header->slice_type);
+                                            NumSubMbPart(sub_mb_type[mbPartIdx],
+                                                         header->slice_type);
                  subMbPartIdx++) {
                 for (int compIdx = 0; compIdx < 2; compIdx++)
                     mvd_l1[mbPartIdx][subMbPartIdx][compIdx] = br.read_se();
             }
+        }
     }
 }
 
@@ -902,9 +912,9 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
     std::shared_ptr<SliceHeader> header = ctx.header();
     if (startIdx == 0 && MbPartPredMode(mb->mb_type, 0, header->slice_type)
                          == Intra_16x16) {
-        if (ctx.pps->entropy_coding_mode_flag())
+        if (ctx.pps->entropy_coding_mode_flag()) {
             throw NotImplemented("entropy_coding_mode_flag");
-        else {
+        } else {
             auto block = std::make_shared<ResidualBlock>(
                     0, 15, 16, BlockType::blk_LUMA_16x16_DC, 0);
             block->parse(ctx,  mb->Intra16x16DCLevel, br);
@@ -912,28 +922,28 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
         }
     }
 
-    ///* some other hacks to make it consistent with JM */
-    //if (mb->mb_type == 23 || mb->mb_type == 18 || mb->mb_type == 26
-    //    || mb->mb_type == 22 || mb->mb_type == 27) {
-    //    mb->CodedBlockPatternLuma = 0xF;
-    //}
+    /* some other hacks to make it consistent with JM */
+    // if (mb->mb_type == 23 || mb->mb_type == 18 || mb->mb_type == 26
+    //     || mb->mb_type == 22 || mb->mb_type == 27) {
+    //     mb->CodedBlockPatternLuma = 0xF;
+    // }
     if (MbPartHeight(mb->mb_type) == 15) {
         mb->CodedBlockPatternLuma = 0xF;
     }
 
     int blkIdx = 0;
     for (int i8x8 = 0; i8x8 < 4; i8x8++) {
-        if (mb->transform_size_8x8_flag == false
-            || ctx.pps->entropy_coding_mode_flag() == false) {
+        if (!mb->transform_size_8x8_flag
+            || !ctx.pps->entropy_coding_mode_flag()) {
             for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                 blkIdx = i8x8 * 4 + i4x4;
 
                 if (mb->CodedBlockPatternLuma & (1 << i8x8)) {
                     if (MbPartPredMode(mb->mb_type, 0, header->slice_type)
                         == Intra_16x16) {
-                        if (ctx.pps->entropy_coding_mode_flag())
+                        if (ctx.pps->entropy_coding_mode_flag()) {
                             throw NotImplemented("entropy_coding_mode_flag");
-                        else {
+                        } else {
                             auto block = std::make_shared<ResidualBlock>(
                                     std::max(0, startIdx - 1), endIdx - 1, 15,
                                     BlockType::blk_LUMA_16x16_AC, blkIdx);
@@ -942,9 +952,9 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
                             residual_blocks.emplace_back(block);
                         }
                     } else {
-                        if (ctx.pps->entropy_coding_mode_flag())
+                        if (ctx.pps->entropy_coding_mode_flag()) {
                             throw NotImplemented("entropy_coding_mode_flag");
-                        else {
+                        } else {
                             auto block = std::make_shared<ResidualBlock>(
                                     startIdx, endIdx, 16,
                                     BlockType::blk_LUMA_4x4, blkIdx);
@@ -953,7 +963,8 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
                             residual_blocks.emplace_back(block);
                         }
                     }
-                } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type) == 1) {
+                } else if (MbPartPredMode(mb->mb_type, 0, header->slice_type)
+                           == 1) {
                     for (int i = 0; i < 15; i++) {
                         mb->Intra16x16ACLevel[blkIdx][i] = 0;
                         mb->TotalCoeffs_luma[blkIdx] = 0;
@@ -974,9 +985,9 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
                 }
             }
         } else if (mb->CodedBlockPatternLuma & (1 << i8x8)) {
-            if (ctx.pps->entropy_coding_mode_flag())
+            if (ctx.pps->entropy_coding_mode_flag()) {
                 throw NotImplemented("entropy_coding_mode_flag");
-            else {
+            } else {
                 auto block = std::make_shared<ResidualBlock>(
                         4 * startIdx, 4 * endIdx + 3, 64,
                         BlockType::blk_LUMA_8x8, i8x8);
@@ -989,7 +1000,6 @@ void Residual::residual_luma(ParserContext &ctx, const int startIdx,
                 mb->LumaLevel8x8[i8x8][i] = 0;
             }
         }
-
     }
 }
 
@@ -1013,13 +1023,14 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
     if (chroma_array_type == 1 || chroma_array_type == 2) {
         int NumC8x8 = 4 / (ctx.SubWidthC() * ctx.SubHeightC());
         for (int iCbCr = 0; iCbCr < 2; iCbCr++) {
-            if ((mb->CodedBlockPatternChroma & 3 || intra_dc) && (startIdx == 0)) {
-                if (ctx.pps->entropy_coding_mode_flag())
+            if ((mb->CodedBlockPatternChroma & 3 || intra_dc) &&
+                    (startIdx == 0)) {
+                if (ctx.pps->entropy_coding_mode_flag()) {
                     throw NotImplemented("entropy_coding_mode_flag");
-                else {
+                } else {
                     auto block = std::make_shared<ResidualBlock>(
                             0, 4 * NumC8x8 - 1, 4 * NumC8x8,
-                            (BlockType)((int)BlockType::blk_CHROMA_DC_Cb + iCbCr), 0);
+                            BlockType::blk_CHROMA_DC_Cb + iCbCr, 0);
                     block->parse(ctx, mb->ChromaDCLevel[iCbCr],
                                  br);
                     residual_blocks.emplace_back(block);
@@ -1036,14 +1047,13 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
                 for (int i4x4 = 0; i4x4 < 4; i4x4++) {
                     int blkIdx = i8x8*4 + i4x4;
                     if (mb->CodedBlockPatternChroma & 2 || intra_ac) {
-                        if (ctx.pps->entropy_coding_mode_flag())
+                        if (ctx.pps->entropy_coding_mode_flag()) {
                             throw NotImplemented("entropy_coding_mode_flag");
-                        else {
+                        } else {
                             auto block = std::make_shared<ResidualBlock>(
                                     std::max(0, startIdx - 1), endIdx - 1, 15,
-                                    (BlockType) (
-                                            (int) BlockType::blk_CHROMA_AC_Cb +
-                                            iCbCr), blkIdx);
+                                    BlockType::blk_CHROMA_AC_Cb +
+                                            iCbCr, blkIdx);
                             block->parse(ctx, mb->ChromaACLevel[iCbCr][blkIdx],
                                          br);
                             residual_blocks.emplace_back(block);
@@ -1056,11 +1066,10 @@ void Residual::residual_chroma(ParserContext &ctx, const int startIdx,
                 }
             }
         }
-
     }
 }
 
-/* taken from https://github.com/emericg/MiniVideo/ */
+// taken from https://github.com/emericg/MiniVideo/
 void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
                           BitReader &br) {
     std::shared_ptr<SPS_NALUnit> sps = ctx.sps;
@@ -1069,23 +1078,23 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     int mbAddrA_temp = -1, mbAddrB_temp = -1;
     int blkA = 0, blkB = 0;
-    int nA = 0, nB = 0, nC = 0; // Number of coefficients (TotalCoeff) in neighboring blocks
+    int nA = 0, nB = 0, nC = 0;  // Number of coefficients (TotalCoeff) in
+    // neighboring blocks
 
-    // 9.2.1 Parsing process for total number of transform coefficient levels and trailing ones
+    // 9.2.1 Parsing process for total number of transform coefficient
+    // levels and trailing ones
     if (block_type == BlockType::blk_CHROMA_DC_Cb
-        || block_type == BlockType::blk_CHROMA_DC_Cr)
-    {
+        || block_type == BlockType::blk_CHROMA_DC_Cr) {
         if (sps->chroma_array_type() == 1)
             nC = -1;
-        else // if (dc->ChromaArrayType == 2)
+        else  // if (dc->ChromaArrayType == 2)
             nC = -2;
     } else {
         // 4
         if (block_type == BlockType::blk_LUMA_16x16_DC
             || block_type == BlockType::blk_LUMA_16x16_AC
             || block_type == BlockType::blk_LUMA_4x4
-            || block_type == BlockType::blk_LUMA_8x8)
-        {
+            || block_type == BlockType::blk_LUMA_8x8) {
             deriv_4x4lumablocks(ctx, block_index, mbAddrA_temp,
                                 blkA, mbAddrB_temp, blkB);
         } else if (block_type == BlockType::blk_CHROMA_AC_Cb
@@ -1093,7 +1102,7 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
             deriv_4x4chromablocks(ctx, block_index, mbAddrA_temp, blkA,
                                   mbAddrB_temp, blkB);
         }
-        if (mbAddrA_temp != -1) { // 5 6 - A
+        if (mbAddrA_temp != -1) {  // 5 6 - A
             if (((header->slice_type == 0 || header->slice_type == 5)
                  && ctx.mb_array[mbAddrA_temp]->mb_type == P_Skip)
                 || ((header->slice_type == 1 || header->slice_type == 6)
@@ -1103,38 +1112,38 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
                        && ctx.mb_array[mbAddrA_temp]->mb_type == I_PCM) {
                 nA = 16;
             } else {
-                if ((int)block_type < 4)
+                if (static_cast<int>(block_type) < 4)
                     nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_luma[blkA];
                 else if (block_type == BlockType::blk_CHROMA_AC_Cb)
-                    nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_chroma[0][blkA];
+                    nA = ctx.mb_array[mbAddrA_temp]->
+                            TotalCoeffs_chroma[0][blkA];
                 else if (block_type == BlockType::blk_CHROMA_AC_Cr)
-                    nA = ctx.mb_array[mbAddrA_temp]->TotalCoeffs_chroma[1][blkA];
+                    nA = ctx.mb_array[mbAddrA_temp]->
+                            TotalCoeffs_chroma[1][blkA];
                 else
                     throw NotImplemented("block_type > 5");
             }
         }
-        if (mbAddrB_temp != -1) // 5 6 - B
-        {
+        if (mbAddrB_temp != -1) {  // 5 6 - B
             if (((header->slice_type == 0 || header->slice_type == 5)
                  && ctx.mb_array[mbAddrB_temp]->mb_type == P_Skip) ||
                 ((header->slice_type == 1 || header->slice_type == 6)
                  && ctx.mb_array[mbAddrB_temp]->mb_type == B_Skip)) {
                 nB = 0;
-            }
-            else if ((header->slice_type == 2 || header->slice_type == 7)
+            } else if ((header->slice_type == 2 || header->slice_type == 7)
                      && ctx.mb_array[mbAddrB_temp]->mb_type == I_PCM) {
                 nB = 16;
-            }
-            else {
-                if ((int)block_type < 4)
+            } else {
+                if (static_cast<int>(block_type) < 4)
                     nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_luma[blkB];
                 else if (block_type  == BlockType::blk_CHROMA_AC_Cb)
-                    nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_chroma[0][blkB];
+                    nB = ctx.mb_array[mbAddrB_temp]->
+                            TotalCoeffs_chroma[0][blkB];
                 else if (block_type  == BlockType::blk_CHROMA_AC_Cr)
-                    nB = ctx.mb_array[mbAddrB_temp]->TotalCoeffs_chroma[1][blkB];
-                else {
+                    nB = ctx.mb_array[mbAddrB_temp]->
+                            TotalCoeffs_chroma[1][blkB];
+                else
                     throw NotImplemented("block_type > 5");
-                }
             }
         }
 
@@ -1158,13 +1167,13 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
         mb->TotalCoeffs_chroma[0][block_index] = TotalCoeffs;
     else if (block_type == BlockType::blk_CHROMA_AC_Cr)
         mb->TotalCoeffs_chroma[1][block_index] = TotalCoeffs;
-    //else
+    // else
     //    throw std::runtime_error("Could not save TotalCoeffs");
 
     if (TotalCoeffs > 0 && TotalCoeffs <= max_num_coeff) {
         // 9.2.2 Parsing process for level information
-        int level[16]; // maximum value for TotalCoeffs
-        int run[16]; // maximum value for TotalCoeffs
+        int level[16];  // maximum value for TotalCoeffs
+        int run[16];  // maximum value for TotalCoeffs
         int suffixLength = 0;
 
         if (TotalCoeffs > 10 && TrailingOnes < 3)
@@ -1187,7 +1196,8 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
                     else if (level_prefix > 14)
                         levelSuffixSize = level_prefix - 3;
 
-                    auto level_suffix = (int)br.read_bits(levelSuffixSize);
+                    auto level_suffix = br.read_bits(
+                            static_cast<uint32_t>(levelSuffixSize));
                     levelCode += level_suffix;
                 }
 
@@ -1256,7 +1266,8 @@ void ResidualBlock::parse(ParserContext &ctx, int *coeffLevel,
     }
 }
 
-void ResidualBlock::deriv_4x4lumablocks(ParserContext &ctx, const int luma4x4BlkIdx,
+void ResidualBlock::deriv_4x4lumablocks(ParserContext &ctx,
+                                        const int luma4x4BlkIdx,
                                         int &mbAddrA, int &luma4x4BlkIdxA,
                                         int &mbAddrB, int &luma4x4BlkIdxB) {
     int x = 0, y = 0;
@@ -1283,7 +1294,6 @@ void ResidualBlock::deriv_4x4lumablocks(ParserContext &ctx, const int luma4x4Blk
         luma4x4BlkIdxB = deriv_4x4lumablock_indices(xW, yW);
     else
         luma4x4BlkIdxB = -1;
-
 }
 
 inline void ResidualBlock::InverseLuma4x4BlkScan(const int luma4x4BlkIdx,
@@ -1294,8 +1304,11 @@ inline void ResidualBlock::InverseLuma4x4BlkScan(const int luma4x4BlkIdx,
         + InverseRasterScan_y(luma4x4BlkIdx % 4, 4, 4, 8);
 }
 
-void ResidualBlock::deriv_neighbouringlocations(ParserContext &ctx, const bool lumaBlock,
-        const int xN, const int yN, int &mbAddrN, int &xW, int &yW) {
+void ResidualBlock::deriv_neighbouringlocations(ParserContext &ctx,
+                                                const bool lumaBlock,
+                                                const int xN, const int yN,
+                                                int &mbAddrN, int &xW,
+                                                int &yW) {
     std::shared_ptr<MacroBlock> mb = ctx.mb;
     int maxW = 16;
     int maxH = 16;
@@ -1309,18 +1322,18 @@ void ResidualBlock::deriv_neighbouringlocations(ParserContext &ctx, const bool l
     // Specification of mbAddrN (Table 6-3 with optimizations)
     if (yN > -1) {
         if (xN < 0)
-            mbAddrN = mb->mbAddrA;
+            mbAddrN = static_cast<int>(mb->mbAddrA);
         else if (xN < maxW)
-            mbAddrN = (int)mb->mb_addr;
+            mbAddrN = static_cast<int>(mb->mb_addr);
         else
             return;
     } else {
         if (xN < 0)
-            mbAddrN = mb->mbAddrD;
+            mbAddrN = static_cast<int>(mb->mbAddrD);
         else if (xN < maxW)
-            mbAddrN = mb->mbAddrB;
+            mbAddrN = static_cast<int>(mb->mbAddrB);
         else
-            mbAddrN = mb->mbAddrC;
+            mbAddrN = static_cast<int>(mb->mbAddrC);
     }
     xW = (xN + maxW) % maxW;
     yW = (yN + maxH) % maxH;

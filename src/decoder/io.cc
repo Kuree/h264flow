@@ -139,12 +139,12 @@ int64_t BinaryReader::bits_left() {
 
 void BinaryWriter::write_uint8(uint8_t value) {
     auto buf = reinterpret_cast<char *>(&value);
-    _stream.write(buf, sizeof(value));
+    stream_.write(buf, sizeof(value));
 }
 
 void BinaryWriter::write_uint32(uint32_t value) {
     auto buf = reinterpret_cast<char *>(&value);
-    _stream.write(buf, sizeof(value));
+    stream_.write(buf, sizeof(value));
 }
 
 int64_t BitReader::read_se() {

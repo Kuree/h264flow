@@ -60,6 +60,7 @@ uint64_t NumSubMbPart(uint64_t sub_mb_type, uint64_t slice_type);
 uint64_t SubMbPredMode(uint64_t sub_mb_type, uint64_t slice_type);
 
 int MbPartPredMode(uint64_t mb_type, uint64_t x, uint64_t slice_type);
+
 uint64_t NumMbPart(uint64_t mb_type);
 
 uint64_t MbPartWidth(uint64_t mb_type);

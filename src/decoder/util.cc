@@ -66,7 +66,7 @@ uint8_t read_ce_levelprefix(BitReader &br) {
     int leadingZeroBits = -1;
     for (int b = 0; !b; leadingZeroBits++)
         b = br.read_bit();
-    return leadingZeroBits;
+    return static_cast<uint8_t>(leadingZeroBits);
 }
 
 int code_from_bitstream_2d(BitReader &br,

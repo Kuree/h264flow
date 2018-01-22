@@ -39,14 +39,14 @@ public:
     explicit Box(BinaryReader & br) : Box(br, true) {}
     Box(uint32_t size, std::string type, BinaryReader &br, bool read_data);
     Box(BinaryReader & br, bool read_data);
-    explicit Box() : _data(), _size(), _type(), _children() {}
+    explicit Box() : data_(), size_(), type_(), children_() {}
     Box(const Box & box);
     explicit Box(std::shared_ptr<Box> box);
 
-    uint32_t size() const { return _size; }
-    std::string type() const { return _type; }
-    std::string data() { return _data; }
-    uint64_t data_offset() { return _data_offset; }
+    uint32_t size() const { return size_; }
+    std::string type() const { return type_; }
+    std::string data() { return data_; }
+    uint64_t data_offset() { return data_offset_; }
 
     virtual void print(const uint32_t indent = 0);
     std::shared_ptr<Box> find_first(std::string type);
@@ -56,21 +56,21 @@ public:
     void add_child(BinaryReader & br) {
         add_child(std::make_shared<Box>(br));
     }
-    const std::vector<std::shared_ptr<Box>> children() { return _children; }
+    const std::vector<std::shared_ptr<Box>> children() { return children_; }
 
     virtual ~Box() = default;
 
 protected:
-    std::string _data;
-    uint32_t _size;
-    std::string _type;
-    std::vector<std::shared_ptr<Box>> _children;
-    uint64_t _data_start = 0;
+    std::string data_;
+    uint32_t size_;
+    std::string type_;
+    std::vector<std::shared_ptr<Box>> children_;
+    uint64_t data_start_ = 0;
 
     BinaryReader get_br(std::istream & stream);
 
 private:
-    uint64_t _data_offset = 0;
+    uint64_t data_offset_ = 0;
     void parse_box(BinaryReader &br, bool read_data);
 };
 
@@ -78,15 +78,15 @@ private:
 class MdatBox : public Box {
 public:
     MdatBox() = delete;
-    explicit MdatBox(Box & box) : Box(box), _nal_units() {}
+    explicit MdatBox(Box & box) : Box(box), nal_units_() {}
     explicit MdatBox(std::shared_ptr<Box> box): MdatBox(*box.get()) { }
 
     void parse(std::vector<uint64_t> offsets);
 
-    std::vector<std::shared_ptr<NALUnit>> nal_units() { return _nal_units; }
+    std::vector<std::shared_ptr<NALUnit>> nal_units() { return nal_units_; }
 
 private:
-    std::vector<std::shared_ptr<NALUnit>> _nal_units;
+    std::vector<std::shared_ptr<NALUnit>> nal_units_;
 };
 
 
@@ -94,12 +94,12 @@ class FullBox : public Box {
 public:
     explicit FullBox(const Box & box);
 
-    uint8_t version() { return _version; }
-    uint32_t flags() { return _flags; }
+    uint8_t version() { return version_; }
+    uint32_t flags() { return flags_; }
 
 protected:
-    uint8_t _version;
-    uint32_t _flags;
+    uint8_t version_;
+    uint32_t flags_;
 
 };
 
@@ -107,24 +107,24 @@ class TkhdBox : public FullBox
 {
 public:
     TkhdBox(Box & box);
-    uint64_t creation_time() { return _creation_time; }
-    uint64_t modification_time() { return _modification_time; }
-    uint32_t track_id() { return _track_id; }
-    uint64_t duration() { return _duration; }
-    uint32_t width() { return _width; }
-    uint32_t height() { return _height; }
+    uint64_t creation_time() { return creation_time_; }
+    uint64_t modification_time() { return modification_time_; }
+    uint32_t track_id() { return track_id_; }
+    uint64_t duration() { return duration_; }
+    uint32_t width() { return width_; }
+    uint32_t height() { return height_; }
 
 private:
-    uint64_t _creation_time = 0;
-    uint64_t _modification_time = 0;
-    uint32_t _track_id = 0;
-    uint64_t _duration = 0;
-    int16_t _volume = 0;
-    uint32_t _width = 0;
-    uint32_t _height = 0;
-    int16_t _layer = 0;
-    int16_t _alternate_group = 0;
-    std::vector<int32_t> _matrix = {
+    uint64_t creation_time_ = 0;
+    uint64_t modification_time_ = 0;
+    uint32_t track_id_ = 0;
+    uint64_t duration_ = 0;
+    int16_t volume_ = 0;
+    uint32_t width_ = 0;
+    uint32_t height_ = 0;
+    int16_t layer_ = 0;
+    int16_t alternate_group_ = 0;
+    std::vector<int32_t> matrix_ = {
             0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x40000000
     };
 };
@@ -141,10 +141,10 @@ public:
     explicit StcoBox(const Box & box) : StcoBox(box, box.type() == "co64") {}
     explicit StcoBox(const Box & box, bool read_large);
 
-    std::vector<uint64_t> chunk_offsets() { return _entries; }
+    std::vector<uint64_t> chunk_offsets() { return entries_; }
 
 private:
-    std::vector<uint64_t> _entries;
+    std::vector<uint64_t> entries_;
 };
 
 class Co64Box : public StcoBox {
@@ -169,22 +169,22 @@ public:
     VisualSampleEntry(const Box & box);
 
     /* accessors */
-    uint16_t width() { return _width; }
-    uint16_t height() { return _height; }
-    std::string compressorname() { return _compressorname; }
-    uint32_t horizresolution() { return _horizresolution; }
-    uint32_t vertresolution() { return _vertresolution; }
-    uint16_t frame_count() { return _frame_count; }
-    uint16_t depth() { return _depth; }
+    uint16_t width() { return width_; }
+    uint16_t height() { return height_; }
+    std::string compressorname() { return compressorname_; }
+    uint32_t horizresolution() { return horizresolution_; }
+    uint32_t vertresolution() { return vertresolution_; }
+    uint16_t frame_count() { return frame_count_; }
+    uint16_t depth() { return depth_; }
 
 private:
-    uint16_t _width;
-    uint16_t _height;
-    std::string _compressorname;
-    uint32_t _horizresolution = 0x00480000; /* 72 dpi */
-    uint32_t _vertresolution = 0x00480000; /* 72 dpi */
-    uint16_t _frame_count = 1;
-    uint16_t _depth = 0x0018;
+    uint16_t width_;
+    uint16_t height_;
+    std::string compressorname_;
+    uint32_t horizresolution_ = 0x00480000; /* 72 dpi */
+    uint32_t vertresolution_ = 0x00480000; /* 72 dpi */
+    uint16_t frame_count_ = 1;
+    uint16_t depth_ = 0x0018;
 };
 
 class AvcC : public Box {
@@ -192,35 +192,35 @@ public:
     AvcC(Box & box);
     AvcC();
 
-    uint8_t configuration_version() { return _configuration_version; }
-    uint8_t avc_profile() { return _avc_profile; }
-    uint8_t avc_profile_compatibility() { return _avc_profile_compatibility; }
-    uint8_t avc_level() { return _avc_level; }
-    uint8_t length_size_minus_one() { return _length_size_minus_one; }
-    std::vector<std::shared_ptr<SPS_NALUnit>> sps_units() { return _sps_units; }
-    std::vector<std::shared_ptr<PPS_NALUnit>> pps_units() { return _pps_units; }
+    uint8_t configuration_version() { return configuration_version_; }
+    uint8_t avc_profile() { return avc_profile_; }
+    uint8_t avc_profile_compatibility() { return avc_profile_compatibility_; }
+    uint8_t avc_level() { return avc_level_; }
+    uint8_t length_size_minus_one() { return length_size_minus_one_; }
+    std::vector<std::shared_ptr<SPS_NALUnit>> sps_units() { return sps_units_; }
+    std::vector<std::shared_ptr<PPS_NALUnit>> pps_units() { return pps_units_; }
 private:
 
-    uint8_t _configuration_version = 1;
-    uint8_t _avc_profile;
-    uint8_t _avc_profile_compatibility;
-    uint8_t _avc_level;
-    uint8_t _length_size_minus_one = 3;
+    uint8_t configuration_version_ = 1;
+    uint8_t avc_profile_;
+    uint8_t avc_profile_compatibility_;
+    uint8_t avc_level_;
+    uint8_t length_size_minus_one_ = 3;
 
-    std::vector<std::shared_ptr<SPS_NALUnit>> _sps_units;
-    std::vector<std::shared_ptr<PPS_NALUnit>> _pps_units;
+    std::vector<std::shared_ptr<SPS_NALUnit>> sps_units_;
+    std::vector<std::shared_ptr<PPS_NALUnit>> pps_units_;
 };
 
 class Avc1 : public VisualSampleEntry {
 public:
     explicit Avc1(const Box & box);
 
-    uint32_t avcc_size() { return _avcc_size; }
-    AvcC & avcC() { return _avcC; }
+    uint32_t avcc_size() { return avcc_size_; }
+    AvcC & avcC() { return avcC_; }
 private:
     /* for avcC */
-    uint32_t _avcc_size;
-    AvcC _avcC;
+    uint32_t avcc_size_;
+    AvcC avcC_;
 };
 
 class StscBox : public FullBox {
@@ -233,17 +233,17 @@ public:
         uint32_t sample_description_index;
     };
 
-    std::vector<StscBox::SampleToChunk> entries() { return _entries; }
+    std::vector<StscBox::SampleToChunk> entries() { return entries_; }
 private:
-    std::vector<StscBox::SampleToChunk> _entries;
+    std::vector<StscBox::SampleToChunk> entries_;
 };
 
 class StszBox : public FullBox {
 public:
     explicit StszBox(std::shared_ptr<Box> box);
-    std::vector<uint32_t> entries() { return _entries; }
+    std::vector<uint32_t> entries() { return entries_; }
 private:
-    std::vector<uint32_t> _entries;
+    std::vector<uint32_t> entries_;
 };
 
 class MP4File {
@@ -259,7 +259,7 @@ public:
     std::string extract_stream(uint64_t position, uint64_t size);
 
 private:
-    std::shared_ptr<Box> _root;
-    std::ifstream _stream;
+    std::shared_ptr<Box> root_;
+    std::ifstream stream_;
 };
 #endif //H264FLOW_MP4_HH

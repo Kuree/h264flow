@@ -107,21 +107,21 @@ private:
 
 class BitReader {
 public:
-    explicit BitReader(std::string data) : _data(std::move(data)) {}
-    inline uint64_t pos() { return _pos; }
-    inline uint8_t bit_pos() { return _bit_pos; }
-    inline uint64_t size() { return _data.size(); }
-    inline void seek(uint64_t pos) { _pos = pos; _bit_pos = 0; }
-    inline void set_bit_pos(uint8_t bit_pos) { _bit_pos = bit_pos; }
+    explicit BitReader(std::string data) : data_(std::move(data)) {}
+    inline uint64_t pos() { return pos_; }
+    inline uint8_t bit_pos() { return bit_pos_; }
+    inline uint64_t size() { return data_.size(); }
+    inline void seek(uint64_t pos) { pos_ = pos; bit_pos_ = 0; }
+    inline void set_bit_pos(uint8_t bit_pos) { bit_pos_ = bit_pos; }
     bool read_bit_as_bool() { return static_cast<bool>(read_bit()); }
-    inline uint8_t read_uint8() { return (uint8_t)_data[_pos++]; }
+    inline uint8_t read_uint8() { return (uint8_t)data_[pos_++]; }
     /* TODO: escape RBSP */
     inline uint8_t read_bit()
     {
-        auto tmp = (uint8_t)_data[_pos];
-        tmp = (uint8_t)((tmp >> (7 - _bit_pos)) & 1);
-        ++_bit_pos;
-        if (_bit_pos == 8) { _bit_pos = 0; ++_pos; }
+        auto tmp = (uint8_t)data_[pos_];
+        tmp = (uint8_t)((tmp >> (7 - bit_pos_)) & 1);
+        ++bit_pos_;
+        if (bit_pos_ == 8) { bit_pos_ = 0; ++pos_; }
         return tmp;
     }
 
@@ -144,11 +144,11 @@ public:
     }
 
     inline uint64_t next_bits(uint64_t bits) {
-        uint64_t curr_pos = _pos;
-        uint8_t bit_pos = _bit_pos;
+        uint64_t curr_pos = pos_;
+        uint8_t bit_pos = bit_pos_;
         uint64_t result = read_bits(bits);
-        _pos = curr_pos;
-        _bit_pos = bit_pos;
+        pos_ = curr_pos;
+        bit_pos_ = bit_pos;
         return result;
     }
 
@@ -162,21 +162,21 @@ public:
 
     int64_t read_se();
 
-    inline int64_t bits_left() { return (_data.size() - _pos) * 8 - _bit_pos; }
+    inline int64_t bits_left() { return (data_.size() - pos_) * 8 - bit_pos_; }
 
 private:
-    std::string _data;
-    uint64_t _pos = 0;
-    uint8_t _bit_pos = 0;
+    std::string data_;
+    uint64_t pos_ = 0;
+    uint8_t bit_pos_ = 0;
 };
 
 class BinaryWriter {
 public:
-    explicit BinaryWriter(std::ostream & stream) : _stream(stream) {}
+    explicit BinaryWriter(std::ostream & stream) : stream_(stream) {}
     void write_uint8(uint8_t value);
     void write_uint32(uint32_t value);
 private:
-    std::ostream & _stream;
+    std::ostream & stream_;
 };
 
 void unescape_rbsp(BinaryReader &br, BinaryWriter &bw, uint64_t size = 0);

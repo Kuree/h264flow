@@ -44,6 +44,12 @@ enum class BlockType {
     blk_UNKNOWN       = 999
 };
 
+
+inline BlockType operator+(BlockType block, int i) {
+    auto result = static_cast<int>(block) + i;
+    return static_cast<BlockType>(result);
+}
+
 class NALUnit {
 public:
     explicit NALUnit(std::string data, bool unescape = true);
@@ -80,97 +86,97 @@ public:
     explicit SPS_NALUnit(NALUnit & unit);
     explicit SPS_NALUnit(std::string data);
 
-    uint8_t profile_idc() const { return _profile_idc; }
-    uint8_t flags() const { return _flags; }
-    uint8_t level_idc() const { return _level_idc; }
-    uint64_t sps_id() const { return _sps_id; }
-    uint64_t chroma_format_idc() const { return _chroma_format_idc; }
+    uint8_t profile_idc() const { return profile_idc_; }
+    uint8_t flags() const { return flags_; }
+    uint8_t level_idc() const { return level_idc_; }
+    uint64_t sps_id() const { return sps_id_; }
+    uint64_t chroma_format_idc() const { return chroma_format_idc_; }
     bool separate_colour_plane_flag() const
-    { return _separate_colour_plane_flag; }
-    uint64_t bit_depth_luma_minus8() const { return _bit_depth_luma_minus8; }
+    { return separate_colour_plane_flag_; }
+    uint64_t bit_depth_luma_minus8() const { return bit_depth_luma_minus8_; }
     uint64_t bit_depth_chroma_minus8() const
-    { return _bit_depth_chroma_minus8; }
+    { return bit_depth_chroma_minus8_; }
     bool qpprime_y_zero_transform_bypass_flag() const
-    { return _qpprime_y_zero_transform_bypass_flag; }
+    { return qpprime_y_zero_transform_bypass_flag_; }
     bool seq_scaling_matrix_present_flag() const
-    { return _seq_scaling_matrix_present_flag; }
+    { return seq_scaling_matrix_present_flag_; }
     uint64_t log2_max_frame_num_minus4() const
-    { return _log2_max_frame_num_minus4; }
-    uint64_t pic_order_cnt_type() const { return _pic_order_cnt_type; }
+    { return log2_max_frame_num_minus4_; }
+    uint64_t pic_order_cnt_type() const { return pic_order_cnt_type_; }
     uint64_t log2_max_pic_order_cnt_lsb_minus4() const
-    { return _log2_max_pic_order_cnt_lsb_minus4; }
+    { return log2_max_pic_order_cnt_lsb_minus4_; }
     bool delta_pic_order_always_zero_flag() const
-    { return _delta_pic_order_always_zero_flag; }
-    int64_t offset_for_non_ref_pic() { return _offset_for_non_ref_pic; }
+    { return delta_pic_order_always_zero_flag_; }
+    int64_t offset_for_non_ref_pic() { return offset_for_non_ref_pic_; }
     int64_t offset_for_top_to_bottom_field() const
-    { return _offset_for_top_to_bottom_field; }
+    { return offset_for_top_to_bottom_field_; }
     uint64_t num_ref_frames_in_pic_order_cnt_cycle() const
-    { return _num_ref_frames_in_pic_order_cnt_cycle; }
+    { return num_ref_frames_in_pic_order_cnt_cycle_; }
     std::vector<uint64_t> offset_for_ref_frame() const
-    { return _offset_for_ref_frame; }
-    uint64_t max_num_ref_frames() const { return _max_num_ref_frames; }
+    { return offset_for_ref_frame_; }
+    uint64_t max_num_ref_frames() const { return max_num_ref_frames_; }
     bool gaps_in_frame_num_value_allowed_flag() const
-    { return _gaps_in_frame_num_value_allowed_flag; }
+    { return gaps_in_frame_num_value_allowed_flag_; }
     uint64_t pic_width_in_mbs_minus1() const
-    { return _pic_width_in_mbs_minus1; }
+    { return pic_width_in_mbs_minus1_; }
     uint64_t pic_height_in_map_units_minus1() const
-    { return _pic_height_in_map_units_minus1; }
-    bool frame_mbs_only_flag() const { return _frame_mbs_only_flag; }
+    { return pic_height_in_map_units_minus1_; }
+    bool frame_mbs_only_flag() const { return frame_mbs_only_flag_; }
     bool mb_adaptive_frame_field_flag() const
-    { return _mb_adaptive_frame_field_flag; }
+    { return mb_adaptive_frame_field_flag_; }
     bool direct_8x8_inference_flag() const
-    { return _direct_8x8_inference_flag; }
-    bool frame_cropping_flag() const { return _frame_cropping_flag; }
-    uint64_t frame_crop_left_offset() const { return _frame_crop_left_offset; }
+    { return direct_8x8_inference_flag_; }
+    bool frame_cropping_flag() const { return frame_cropping_flag_; }
+    uint64_t frame_crop_left_offset() const { return frame_crop_left_offset_; }
     uint64_t frame_crop_right_offset() const
-    { return _frame_crop_right_offset; }
-    uint64_t frame_crop_top_offset() const { return _frame_crop_top_offset; }
+    { return frame_crop_right_offset_; }
+    uint64_t frame_crop_top_offset() const { return frame_crop_top_offset_; }
     uint64_t frame_crop_bottom_offset() const
-    { return _frame_crop_bottom_offset; }
+    { return frame_crop_bottom_offset_; }
     bool vui_parameters_present_flag() const
-    { return _vui_parameters_present_flag; }
+    { return vui_parameters_present_flag_; }
 
     uint64_t chroma_array_type() const {
-        return _separate_colour_plane_flag ? 0 : _chroma_format_idc;
+        return separate_colour_plane_flag_ ? 0 : chroma_format_idc_;
     }
 
 protected:
     void parse() override;
 
 private:
-    uint8_t _profile_idc = 0;
-    uint8_t _flags = 0;
-    uint8_t _level_idc = 0;
-    uint64_t _sps_id = 0;
+    uint8_t profile_idc_ = 0;
+    uint8_t flags_ = 0;
+    uint8_t level_idc_ = 0;
+    uint64_t sps_id_ = 0;
     /* chroma_format_idc is not present, it shall be
      * inferred to be equal to 1 (4:2:0 chroma format). */
-    uint64_t _chroma_format_idc = 1;
-    bool _separate_colour_plane_flag = false;
-    uint64_t _bit_depth_luma_minus8 = 0;
-    uint64_t _bit_depth_chroma_minus8 = 0;
-    bool _qpprime_y_zero_transform_bypass_flag = false;
-    bool _seq_scaling_matrix_present_flag = false;
-    uint64_t _log2_max_frame_num_minus4 = 0;
-    uint64_t _pic_order_cnt_type = 0;
-    uint64_t _log2_max_pic_order_cnt_lsb_minus4 = 0;
-    bool _delta_pic_order_always_zero_flag = false;
-    int64_t _offset_for_non_ref_pic = 0;
-    int64_t _offset_for_top_to_bottom_field = 0;
-    uint64_t _num_ref_frames_in_pic_order_cnt_cycle = 0;
-    std::vector<uint64_t> _offset_for_ref_frame;
-    uint64_t _max_num_ref_frames = 0;
-    bool _gaps_in_frame_num_value_allowed_flag = false;
-    uint64_t _pic_width_in_mbs_minus1 = 0;
-    uint64_t _pic_height_in_map_units_minus1 = 0;
-    bool _frame_mbs_only_flag = false;
-    bool _mb_adaptive_frame_field_flag = false;
-    bool _direct_8x8_inference_flag = false;
-    bool _frame_cropping_flag = false;
-    uint64_t _frame_crop_left_offset = 0;
-    uint64_t _frame_crop_right_offset = 0;
-    uint64_t _frame_crop_top_offset = 0;
-    uint64_t _frame_crop_bottom_offset = 0;
-    bool _vui_parameters_present_flag = false;
+    uint64_t chroma_format_idc_ = 1;
+    bool separate_colour_plane_flag_ = false;
+    uint64_t bit_depth_luma_minus8_ = 0;
+    uint64_t bit_depth_chroma_minus8_ = 0;
+    bool qpprime_y_zero_transform_bypass_flag_ = false;
+    bool seq_scaling_matrix_present_flag_ = false;
+    uint64_t log2_max_frame_num_minus4_ = 0;
+    uint64_t pic_order_cnt_type_ = 0;
+    uint64_t log2_max_pic_order_cnt_lsb_minus4_ = 0;
+    bool delta_pic_order_always_zero_flag_ = false;
+    int64_t offset_for_non_ref_pic_ = 0;
+    int64_t offset_for_top_to_bottom_field_ = 0;
+    uint64_t num_ref_frames_in_pic_order_cnt_cycle_ = 0;
+    std::vector<uint64_t> offset_for_ref_frame_;
+    uint64_t max_num_ref_frames_ = 0;
+    bool gaps_in_frame_num_value_allowed_flag_ = false;
+    uint64_t pic_width_in_mbs_minus1_ = 0;
+    uint64_t pic_height_in_map_units_minus1_ = 0;
+    bool frame_mbs_only_flag_ = false;
+    bool mb_adaptive_frame_field_flag_ = false;
+    bool direct_8x8_inference_flag_ = false;
+    bool frame_cropping_flag_ = false;
+    uint64_t frame_crop_left_offset_ = 0;
+    uint64_t frame_crop_right_offset_ = 0;
+    uint64_t frame_crop_top_offset_ = 0;
+    uint64_t frame_crop_bottom_offset_ = 0;
+    bool vui_parameters_present_flag_ = false;
 };
 
 
@@ -179,73 +185,73 @@ public:
     explicit PPS_NALUnit(NALUnit & unit);
     explicit PPS_NALUnit(std::string data);
 
-    uint64_t pps_id() const { return _pps_id; }
-    uint64_t sps_id() const { return _sps_id; }
-    bool entropy_coding_mode_flag() const { return _entropy_coding_mode_flag; }
+    uint64_t pps_id() const { return pps_id_; }
+    uint64_t sps_id() const { return sps_id_; }
+    bool entropy_coding_mode_flag() const { return entropy_coding_mode_flag_; }
     bool bottom_field_pic_order_in_frame_present_flag() const
-    { return _bottom_field_pic_order_in_frame_present_flag; }
+    { return bottom_field_pic_order_in_frame_present_flag_; }
     uint64_t num_slice_groups_minus1() const
-    { return _num_slice_groups_minus1; }
-    uint64_t slice_group_map_type() const { return _slice_group_map_type; }
+    { return num_slice_groups_minus1_; }
+    uint64_t slice_group_map_type() const { return slice_group_map_type_; }
     std::vector<uint64_t> run_length_minus1() const
-    { return _run_length_minus1; }
-    std::vector<uint64_t> top_left() const { return _top_left; }
-    std::vector<uint64_t> bottom_right() const { return _bottom_right; }
+    { return run_length_minus1_; }
+    std::vector<uint64_t> top_left() const { return top_left_; }
+    std::vector<uint64_t> bottom_right() const { return bottom_right_; }
     bool slice_group_change_direction_flag() const
-    { return _slice_group_change_direction_flag; }
+    { return slice_group_change_direction_flag_; }
     uint64_t slice_group_change_rate_minus1() const
-    { return _slice_group_change_rate_minus1; }
+    { return slice_group_change_rate_minus1_; }
     uint64_t pic_size_in_map_units_minus1() const
-    { return _pic_size_in_map_units_minus1; }
-    std::vector<uint64_t> slice_group_id() const { return _slice_group_id; }
+    { return pic_size_in_map_units_minus1_; }
+    std::vector<uint64_t> slice_group_id() const { return slice_group_id_; }
     uint64_t num_ref_idx_l0_default_active_minus1() const
-    { return _num_ref_idx_l0_default_active_minus1; }
+    { return num_ref_idx_l0_default_active_minus1_; }
     uint64_t num_ref_idx_l1_default_active_minus1() const
-    { return _num_ref_idx_l1_default_active_minus1; }
-    bool weighted_pred_flag() const { return _weighted_pred_flag; }
-    uint64_t weighted_bipred_idc() const { return _weighted_bipred_idc; }
-    int64_t pic_init_qp_minus26() const { return _pic_init_qp_minus26;}
-    int64_t pic_init_qs_minus26() const { return _pic_init_qs_minus26; }
-    int64_t chroma_qp_index_offset() const { return _chroma_qp_index_offset; }
+    { return num_ref_idx_l1_default_active_minus1_; }
+    bool weighted_pred_flag() const { return weighted_pred_flag_; }
+    uint64_t weighted_bipred_idc() const { return weighted_bipred_idc_; }
+    int64_t pic_init_qp_minus26() const { return pic_init_qp_minus26_;}
+    int64_t pic_init_qs_minus26() const { return pic_init_qs_minus26_; }
+    int64_t chroma_qp_index_offset() const { return chroma_qp_index_offset_; }
     bool deblocking_filter_control_present_flag() const
-    {return _deblocking_filter_control_present_flag; }
+    {return deblocking_filter_control_present_flag_; }
     bool constrained_intra_pred_flag() const
-    { return _constrained_intra_pred_flag; }
+    { return constrained_intra_pred_flag_; }
     bool redundant_pic_cnt_present_flag() const
-    {return _redundant_pic_cnt_present_flag; }
-    bool transform_8x8_mode_flag() const { return _transform_8x8_mode_flag; }
+    {return redundant_pic_cnt_present_flag_; }
+    bool transform_8x8_mode_flag() const { return transform_8x8_mode_flag_; }
     bool pic_scaling_matrix_present_flag() const
-    { return _pic_scaling_matrix_present_flag; }
+    { return pic_scaling_matrix_present_flag_; }
 
 protected:
     void parse() override;
 
 private:
-    uint64_t _pps_id = 0;
-    uint64_t _sps_id = 0;
-    bool _entropy_coding_mode_flag = false;
-    bool _bottom_field_pic_order_in_frame_present_flag = false;
-    uint64_t _num_slice_groups_minus1 = 0;
-    uint64_t _slice_group_map_type = 0;
-    std::vector<uint64_t> _run_length_minus1;
-    std::vector<uint64_t> _top_left;
-    std::vector<uint64_t> _bottom_right;
-    bool _slice_group_change_direction_flag = false;
-    uint64_t _slice_group_change_rate_minus1 = 0;
-    uint64_t _pic_size_in_map_units_minus1 = 0;
-    std::vector<uint64_t> _slice_group_id;
-    uint64_t _num_ref_idx_l0_default_active_minus1 = 0;
-    uint64_t _num_ref_idx_l1_default_active_minus1 = 0;
-    bool _weighted_pred_flag = false;
-    uint64_t _weighted_bipred_idc = 0;
-    int64_t _pic_init_qp_minus26 = 0;
-    int64_t _pic_init_qs_minus26 = 0;
-    int64_t _chroma_qp_index_offset = 0;
-    bool _deblocking_filter_control_present_flag = false;
-    bool _constrained_intra_pred_flag = false;
-    bool _redundant_pic_cnt_present_flag = false;
-    bool _transform_8x8_mode_flag = false;
-    bool _pic_scaling_matrix_present_flag = false;
+    uint64_t pps_id_ = 0;
+    uint64_t sps_id_ = 0;
+    bool entropy_coding_mode_flag_ = false;
+    bool bottom_field_pic_order_in_frame_present_flag_ = false;
+    uint64_t num_slice_groups_minus1_ = 0;
+    uint64_t slice_group_map_type_ = 0;
+    std::vector<uint64_t> run_length_minus1_;
+    std::vector<uint64_t> top_left_;
+    std::vector<uint64_t> bottom_right_;
+    bool slice_group_change_direction_flag_ = false;
+    uint64_t slice_group_change_rate_minus1_ = 0;
+    uint64_t pic_size_in_map_units_minus1_ = 0;
+    std::vector<uint64_t> slice_group_id_;
+    uint64_t num_ref_idx_l0_default_active_minus1_ = 0;
+    uint64_t num_ref_idx_l1_default_active_minus1_ = 0;
+    bool weighted_pred_flag_ = false;
+    uint64_t weighted_bipred_idc_ = 0;
+    int64_t pic_init_qp_minus26_ = 0;
+    int64_t pic_init_qs_minus26_ = 0;
+    int64_t chroma_qp_index_offset_ = 0;
+    bool deblocking_filter_control_present_flag_ = false;
+    bool constrained_intra_pred_flag_ = false;
+    bool redundant_pic_cnt_present_flag_ = false;
+    bool transform_8x8_mode_flag_ = false;
+    bool pic_scaling_matrix_present_flag_ = false;
 };
 
 class RefPicListModification {
