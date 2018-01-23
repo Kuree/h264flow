@@ -148,4 +148,7 @@ std::map<uint64_t, uint64_t> match_motion_region(
         std::vector<MotionRegion> regions1, std::vector<MotionRegion> regions2,
         float threshold);
 
+std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
+        const MotionRegion & region);
+
 #endif //H264FLOW_OPERATOR_HH

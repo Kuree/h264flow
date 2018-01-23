@@ -199,7 +199,8 @@ std::vector<MotionRegion> mv_partition(const MvFrame &frame,
         std::set<MotionVector> s;
         add_points(visited, s, frame, index, frame.mb_width(),
                    frame.mb_height());
-        if (s.size() > 1) {
+        /* TODO: this this magic number */
+        if (s.size() > 4) {
             MotionRegion mr(s);
             result.emplace_back(mr);
         }
@@ -366,4 +367,21 @@ std::map<uint64_t, uint64_t> match_motion_region(
     }
 
     return result;
+}
+
+std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
+        const MotionRegion & region) {
+    uint32_t x_min = 0xFFFFFFFF, y_min = 0xFFFFFFFF;
+    uint32_t x_max = 0, y_max = 0;
+    for (auto const & mv : region.mvs) {
+        if (mv.x < x_min)
+            x_min = mv.x;
+        if (mv.y < y_min)
+            y_min = mv.y;
+        if (mv.x > x_max)
+            x_max = mv.x;
+        if (mv.y > y_max)
+            y_max = mv.y;
+    }
+    return std::make_tuple(x_min, y_min, x_max, y_max);
 }

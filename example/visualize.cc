@@ -77,6 +77,10 @@ void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
                         FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
             }
         }
+        /* draw the bbox */
+        uint32_t x1, y1, x2, y2;
+        tie(x1, y1, x2, y2) = get_bbox(s);
+        rectangle(mat, Point(x1, y1), Point(x2, y2), Scalar(0, 255, 0), 2);
     }
 }
 
