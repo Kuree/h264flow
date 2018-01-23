@@ -17,13 +17,13 @@
 #include <algorithm>
 #include <opencv2/opencv.hpp>
 #include "../src/query/operator.hh"
-#include "../src/decoder/h264.hh"
 #include "../src/util/argparser.hh"
 
 using namespace cv;
 using namespace std;
 
-void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
+void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
+             vector<MotionRegion> &current_mr, map<uint64_t, uint64_t> &mr_id) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
@@ -48,10 +48,9 @@ void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
         }
     }
 
-
     /* draw the motion region */
-    std::vector<MotionRegion> regions = mv_partition(mvs, region_threshold);
-    for (const auto &s : regions) {
+    auto region_matches = match_motion_region(current_mr, pre_mr, 50);
+    for (const auto &s : current_mr) {
         for (const auto &p : s.mvs) {
             if (p.x + 16 > (uint32_t)mat.cols || p.y + 16 > (uint32_t)mat.rows)
                 continue;
@@ -59,6 +58,24 @@ void draw_mv(MvFrame &mvs, Mat &mat, uint32_t region_threshold) {
             cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
             float alpha = 0.3;
             addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);
+            /* notice that in the region matches, it's arg1 -> arg2,
+             * so we are good */
+            if (region_matches.find(s.id) != region_matches.end()) {
+                uint64_t old_id = region_matches[s.id];
+                uint64_t id = 0;
+                if (mr_id.find(old_id) != mr_id.end()) {
+                    id = mr_id[old_id];
+                    //mr_id.erase(old_id);
+                    mr_id.insert({s.id, id});
+                } else {
+                    id = mr_id.size();
+                    mr_id.insert({s.id, id});
+                }
+                /* put id label on centroid */
+                Point pt(static_cast<int>(s.x), static_cast<int>(s.y));
+                putText(mat, "ID " + to_string(id), pt,
+                        FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
+            }
         }
     }
 }
@@ -91,6 +108,11 @@ int main(int argc, char *argv[]) {
     /* open decoder */
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
+    /* motion region information*/
+    vector<MotionRegion> pre_mr;
+    vector<MotionRegion> current_mr;
+    map<uint64_t, uint64_t> mr_id;
+
     namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
     for (; frame_counter < decoder->index_size(); frame_counter++) {
@@ -101,7 +123,11 @@ int main(int argc, char *argv[]) {
         /* median filter */
         if (median)
             mvs = median_filter(mvs, median);
-        draw_mv(mvs, frame, motion_threshold);
+
+        current_mr = mv_partition(mvs, motion_threshold);
+        draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
+        pre_mr = current_mr;
+
         imshow("video", frame);
         waitKey(10);
     }

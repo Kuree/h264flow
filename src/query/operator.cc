@@ -172,16 +172,6 @@ void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
     }
 }
 
-std::pair<float, float> compute_centroid(const std::set<MotionVector> &set) {
-    float sum_x = 0, sum_y = 0;
-    for (const auto &mv : set) {
-        sum_x += mv.mvL0[0];
-        sum_y += mv.mvL0[1];
-    }
-    uint64_t size = set.size();
-    return std::make_pair(sum_x / size, sum_y / size);
-}
-
 std::vector<MotionRegion> mv_partition(const MvFrame &frame,
                                                  double threshold) {
     std::vector<bool> visited = std::vector<bool>(frame.mb_height() *
@@ -210,10 +200,7 @@ std::vector<MotionRegion> mv_partition(const MvFrame &frame,
         add_points(visited, s, frame, index, frame.mb_width(),
                    frame.mb_height());
         if (s.size() > 1) {
-            /* compute centroid */
-            float x, y;
-            std::tie(x, y) = compute_centroid(s);
-            MotionRegion mr (s, x, y);
+            MotionRegion mr(s);
             result.emplace_back(mr);
         }
         index++;
@@ -323,4 +310,60 @@ std::set<MotionVector> background_filter(const MvFrame & frame) {
                         obj_flatten.begin(), obj_flatten.end(),
                         std::inserter(background, background.begin()));
     return background;
+}
+
+
+inline bool operator==(const MotionRegion &lhs, const MotionRegion &rhs)
+{ return lhs.id == rhs.id; }
+
+inline bool operator<(const MotionRegion &lhs, const MotionRegion &rhs)
+{ return lhs.id < rhs.id; }
+
+/* initialize static members */
+std::mt19937_64 MotionRegion::gen_ = std::mt19937_64(std::random_device()());
+std::uniform_int_distribution<unsigned long long> MotionRegion::dis_ =
+        std::uniform_int_distribution<unsigned long long>();
+
+
+std::pair<float, float> compute_centroid(const std::set<MotionVector> &set) {
+    float sum_x = 0, sum_y = 0;
+    for (const auto &mv : set) {
+        sum_x += mv.x;
+        sum_y += mv.y;
+    }
+    uint64_t size = set.size();
+    return std::make_pair(sum_x / size, sum_y / size);
+}
+
+MotionRegion::MotionRegion(std::set<MotionVector> mvs)
+        : mvs(std::move(mvs)), id(0) {
+    while (!id) {
+        id = MotionRegion::dis_(MotionRegion::gen_);
+    }
+    /* compute centroid */
+    std::tie(x, y) = compute_centroid(this->mvs);
+}
+
+std::map<uint64_t, uint64_t> match_motion_region(
+        std::vector<MotionRegion> regions1, std::vector<MotionRegion> regions2,
+        float threshold) {
+    /* TODO: optimize this */
+    std::map<uint64_t, uint64_t> result;
+    std::set<MotionRegion> mr2 = std::set<MotionRegion>(regions2.begin(),
+                                                        regions2.end());
+    for (const auto &r1 : regions1) {
+        for (const auto &r2 : mr2) {
+            if (r1 == r2)
+                break;
+            float distance = std::sqrt((r1.x - r2.x) * (r1.x - r2.x) +
+                                               (r1.y - r2.y) * (r1.y - r2.y));
+            if (distance < threshold) {
+                result.insert({r1.id, r2.id});
+                mr2.erase(r2);
+                break;
+            }
+        }
+    }
+
+    return result;
 }

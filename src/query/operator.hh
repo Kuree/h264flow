@@ -19,6 +19,7 @@
 
 #include <set>
 #include <map>
+#include <random>
 #include "../decoder/h264.hh"
 
 
@@ -102,19 +103,26 @@ std::vector<uint32_t> angle_histogram(MvFrame &frame, uint32_t row_start,
                                       uint32_t col_start, uint32_t width,
                                       uint32_t height, uint32_t bins);
 
-struct MotionRegion {
+class MotionRegion {
+public:
     std::set<MotionVector> mvs;
     /* those are centroid */
     float x = 0;
     float y = 0;
-    MotionRegion(std::set<MotionVector> mvs, float x, float y)
-            : mvs(mvs), x(x), y(y) {}
-    MotionRegion() : mvs() {}
+    uint64_t id;
+    MotionRegion(std::set<MotionVector> mvs);
+    MotionRegion() : MotionRegion(std::set<MotionVector>()) {}
+
+private:
+    static std::mt19937_64 gen_;
+    static std::uniform_int_distribution<unsigned long long> dis_;
 };
+
+inline bool operator==(const MotionRegion &lhs, const MotionRegion &rhs);
+inline bool operator<(const MotionRegion &lhs, const MotionRegion &rhs);
 
 std::vector<MotionRegion> mv_partition(const MvFrame &frame,
                                                  double threshold);
-
 
 enum MotionType {
     NoMotion = 0,
@@ -135,5 +143,9 @@ std::map<MotionType, bool> CategorizeCameraMotion(
         double fraction = 0.6);
 
 std::set<MotionVector> background_filter(const MvFrame & frame);
+
+std::map<uint64_t, uint64_t> match_motion_region(
+        std::vector<MotionRegion> regions1, std::vector<MotionRegion> regions2,
+        float threshold);
 
 #endif //H264FLOW_OPERATOR_HH
