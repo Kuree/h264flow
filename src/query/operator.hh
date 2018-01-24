@@ -96,6 +96,8 @@ private:
 MvFrame median_filter(const MvFrame &frame, uint32_t size);
 MvFrame horizontal_filter(MvFrame &frame);
 MvFrame vertical_filter(MvFrame &frame);
+/* perform median filter in temporal domain */
+MvFrame median_filter(std::vector<MvFrame> frames);
 
 bool operator<(const MotionVector &p1, const MotionVector &p2);
 

@@ -435,8 +435,7 @@ MvFrame::MvFrame(ParserContext &ctx) : mvs_() {
     width_ = ctx.Width();
     mb_width_ = (uint32_t)ctx.PicWidthInMbs();
     mb_height_ = (uint32_t)ctx.PicHeightInMapUnits();
-    mvs_ = std::vector<std::vector<MotionVector>>(
-            mb_height_, std::vector<MotionVector>(mb_width_));
+    mvs_ = std::vector<MotionVector>(mb_height_ * mb_width_);
     for (uint32_t i = 0; i < mb_height_; i++) {
         for (uint32_t j = 0; j < mb_width_; j++) {
             /* compute mb_addr */
@@ -452,7 +451,7 @@ MvFrame::MvFrame(ParserContext &ctx) : mvs_() {
             };
             mv.energy = uint32_t(mv.mvL0[0] * mv.mvL0[0] +
                                          mv.mvL0[1] * mv.mvL0[1]);
-            mvs_[i][j] = mv;
+            mvs_[mb_addr] = mv;
         }
     }
 }
@@ -461,12 +460,12 @@ MvFrame::MvFrame(const MvFrame &frame) : height_(frame.height_),
                                          width_(frame.width_),
                                          mb_width_(frame.mb_width_),
                                          mb_height_(frame.mb_height_), mvs_() {
-    mvs_ = std::vector<std::vector<MotionVector>>(
-            mb_height_, std::vector<MotionVector>(mb_width_));
+    mvs_ = std::vector<MotionVector>(mb_height_ * mb_width_);
 
     for (uint32_t i = 0; i < mb_height_; i++) {
         for (uint32_t j = 0; j < mb_width_; j++) {
-            mvs_[i][j] = frame.mvs_[i][j];
+            uint32_t mb_addr = i * mb_width_ + j;
+            mvs_[mb_addr] = frame.mvs_[mb_addr];
         }
     }
 }
@@ -475,24 +474,14 @@ MvFrame::MvFrame(uint32_t pic_width, uint32_t pic_height, uint32_t mb_width,
                  uint32_t mb_height, bool p_frame)
         : height_(pic_height), width_(pic_width), mb_width_(mb_width),
           mb_height_(mb_height), mvs_(), p_frame_(p_frame) {
-    mvs_ = std::vector<std::vector<MotionVector>>(
-            mb_height_, std::vector<MotionVector>(mb_width_));
+    mvs_ = std::vector<MotionVector>(mb_height_ * mb_width_);
     for (uint32_t i = 0; i < mb_height_; i++) {
         for (uint32_t j = 0; j < mb_width_; j++) {
             MotionVector mv;
             mv.x = j;
             mv.y = i;
-            mvs_[i][j] = mv;
+            uint32_t mb_addr = i * mb_width_ + j;
+            mvs_[mb_addr] = mv;
         }
     }
-}
-
-MotionVector MvFrame::get_mv(uint32_t x, uint32_t y) const {
-    return mvs_[y][x];
-}
-
-MotionVector MvFrame::get_mv(uint32_t mb_addr) const {
-    uint32_t j = mb_addr % mb_width_;
-    uint32_t i = mb_addr / mb_width_;
-    return mvs_[i][j];
 }

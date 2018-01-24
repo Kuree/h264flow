@@ -38,7 +38,7 @@ void init_mv_frame(py::module &m) {
             .def_property_readonly("mvL0", [](MvFrame &mv) {
                 auto lst = py::list();
                 for (uint32_t i = 0; i < mv.height() / 16; i++) {
-                    auto row = mv.get_row(i);
+                    auto row = mv[i];
                     auto row_list = py::list();
                     for (uint32_t j = 0; j < row.size(); j++)
                         row_list.append(py::array(2, row[j].mvL0));

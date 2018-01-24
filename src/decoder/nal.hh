@@ -551,17 +551,20 @@ public:
     std::shared_ptr<MacroBlock> mb = nullptr;
     std::vector<std::shared_ptr<MacroBlock>> mb_array;
 
-    uint64_t PicHeightInMapUnits() { return sps->pic_height_in_map_units_minus1() + 1; }
-    uint64_t PicWidthInMbs() { return sps->pic_width_in_mbs_minus1() + 1; }
-    uint64_t FrameHeightInMbs() { return  (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits(); }
-    uint64_t PicHeightInMbs()
+    inline uint64_t PicHeightInMapUnits()
+    { return sps->pic_height_in_map_units_minus1() + 1; }
+    inline uint64_t PicWidthInMbs()
+    { return sps->pic_width_in_mbs_minus1() + 1; }
+    inline uint64_t FrameHeightInMbs()
+    { return  (2 - sps->frame_mbs_only_flag()) * PicHeightInMapUnits(); }
+    inline uint64_t PicHeightInMbs()
     { return _header ? FrameHeightInMbs() / (1 + _header->field_pic_flag) : 0; }
     uint64_t PicSizeInMbs() { return PicWidthInMbs() * PicHeightInMbs(); }
 
     uint32_t SubHeightC();
     uint32_t SubWidthC();
-    uint32_t MbWidthC() { return 16 / SubWidthC(); }
-    uint32_t MbHeightC() { return 16 / SubHeightC(); }
+    inline uint32_t MbWidthC() { return 16 / SubWidthC(); }
+    inline uint32_t MbHeightC() { return 16 / SubHeightC(); }
 
     uint32_t Height();
     uint32_t Width();

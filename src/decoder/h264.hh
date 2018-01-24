@@ -48,21 +48,22 @@ public:
             uint32_t mb_height, bool p_frame = false);
     MvFrame() : mvs_() {}
     MvFrame(const MvFrame& frame);
-    MotionVector get_mv(uint32_t mb_addr) const;
-    MotionVector get_mv(uint32_t x, uint32_t y) const;
+    inline MotionVector get_mv(uint32_t mb_addr) const { return mvs_[mb_addr]; }
+    MotionVector get_mv(uint32_t x, uint32_t y) const
+    { return mvs_[y * mb_width_ + x]; }
     inline void set_mv(uint32_t x, uint32_t y, MotionVector mv)
-    { mvs_[y][x] = mv; }
+    { mvs_[y * mb_width_ + x] = mv; }
     inline void set_mv(uint32_t mb_addr, MotionVector mv)
-    { mvs_[mb_addr / mb_width_][mb_addr % mb_width_] = mv; }
-    inline std::vector<MotionVector> get_row(uint32_t row) const
-    { return mvs_[row]; }
+    { mvs_[mb_addr] = mv; }
 
     inline uint32_t height() const { return height_; }
     inline uint32_t width() const { return width_; }
     inline uint32_t mb_height() const { return mb_height_; }
     inline uint32_t mb_width() const { return mb_width_; }
 
-    inline std::vector<MotionVector>operator[](uint32_t y) { return mvs_[y]; }
+    inline std::vector<MotionVector> operator[](const uint32_t &y) const
+    { return std::vector<MotionVector>(&mvs_[y * mb_width_],
+                                       &mvs_[(y + 1) * mb_width_]); }
 
     inline bool p_frame() const { return p_frame_; }
 
@@ -71,7 +72,7 @@ private:
     uint32_t width_ = 0;
     uint32_t mb_width_ = 0;
     uint32_t mb_height_ = 0;
-    std::vector<std::vector<MotionVector>> mvs_;
+    std::vector<MotionVector> mvs_;
     bool p_frame_ = true;
 };
 

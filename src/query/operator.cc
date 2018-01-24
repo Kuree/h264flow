@@ -51,7 +51,7 @@ MvFrame median_filter(const MvFrame &frame, uint32_t size) {
     uint32_t median_element = size / 2;
     for (uint32_t i = median_element;
          i < frame.mb_height() - median_element; i++) {
-        std::vector<MotionVector> mv_row = frame.get_row(i);
+        std::vector<MotionVector> mv_row = frame[i];
         for (uint32_t j = median_element;
              j < frame.mb_width() - median_element; j++) {
             /* TODO: optimize this */
@@ -80,11 +80,46 @@ MvFrame median_filter(const MvFrame &frame, uint32_t size) {
     return result;
 }
 
+MvFrame median_filter(std::vector<MvFrame> mv_frames) {
+    uint32_t mb_height = mv_frames[0].mb_height();
+    uint32_t mb_width = mv_frames[0].mb_width();
+    /* check if the dimensions are matched */
+    for (const auto & frame : mv_frames) {
+        if (mb_height != frame.mb_height() || mb_width != frame.mb_width())
+            throw std::runtime_error("dimension does not match");
+    }
+
+    /* just do a copy. we're going to override it anyways */
+    MvFrame result = MvFrame(mv_frames[0]);
+    uint64_t median_element = mv_frames.size() / 2;
+    for (uint32_t i = 0; i < mb_height; i++) {
+        for (uint32_t j = 0; j < mb_width; j++) {
+            std::vector<float> values0(mv_frames.size());
+            std::vector<float> values1(mv_frames.size());
+            /* TODO: optimize this. this is not efficient for the
+             * cache */
+            for (uint32_t k = 0; k < values0.size(); k++) {
+                values0[k] = mv_frames[k].get_mv(j, i).mvL0[0];
+                values1[k] = mv_frames[k].get_mv(j, i).mvL0[1];
+            }
+            auto mv = result.get_mv(j, i);
+            std::nth_element(values0.begin(), values0.begin() +
+                    median_element, values0.end());
+            std::nth_element(values1.begin(), values1.begin() +
+                    median_element, values1.end());
+            mv.mvL0[0] = values0[median_element];
+            mv.mvL0[1] = values1[median_element];
+            result.set_mv(j, i, mv);
+        }
+    }
+    return result;
+}
+
 MvFrame horizontal_filter(MvFrame &frame) {
     MvFrame result = MvFrame(frame.width(), frame.height(), frame.mb_width(),
                              frame.mb_height());
     for (uint32_t i = 0; i < frame.mb_height(); i++) {
-        std::vector<MotionVector> mv_row = frame.get_row(i);
+        std::vector<MotionVector> mv_row = frame[i];
         for (uint32_t j = 0; j < frame.mb_width(); j++) {
             MotionVector mv;
             mv.mvL0[0] = mv.mvL0[0];
@@ -98,7 +133,7 @@ MvFrame vertical_filter(MvFrame &frame) {
     MvFrame result = MvFrame(frame.width(), frame.height(), frame.mb_width(),
                              frame.mb_height());
     for (uint32_t i = 0; i < frame.mb_height(); i++) {
-        std::vector<MotionVector> mv_row = frame.get_row(i);
+        std::vector<MotionVector> mv_row = frame[i];
         for (uint32_t j = 0; j < frame.mb_width(); j++) {
             MotionVector mv;
             mv.mvL0[1] = mv.mvL0[1];

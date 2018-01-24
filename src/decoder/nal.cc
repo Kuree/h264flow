@@ -30,10 +30,11 @@ NALUnit::NALUnit(BinaryReader & br, uint32_t size, bool unescape)
         : _nal_ref_idc(), _nal_unit_type(), _data() {
     decode_header(br);
     if (unescape) {
-        std::ostringstream stream;
-        BinaryWriter bw(stream);
-        unescape_rbsp(br, bw, size - 1);
-        _data = stream.str();
+        /* TODO: re-enable unescape in BitReader */
+        // std::ostringstream stream;
+        // BinaryWriter bw(stream);
+        // unescape_rbsp(br, bw, size - 1);
+        _data = br.read_bytes(size - 1);
     } else {
         _data = br.read_bytes(size - 1);
     }

@@ -92,6 +92,8 @@ int main(int argc, char *argv[]) {
             "default is 0.", false);
     parser.add_arg("-t", "threshold", "threshold to perform motion region partition. "
             "default is 4.", false);
+    parser.add_arg("-M", "median_t", "temporal median filter size. set to 0 to disable."
+            " default is 0", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
@@ -103,6 +105,9 @@ int main(int argc, char *argv[]) {
     uint32_t motion_threshold = 4;
     if (arg_values.find("threshold") != arg_values.end())
         motion_threshold = (uint32_t)stoi(arg_values["threshold"]);
+    uint32_t median_t = 0;
+    if (arg_values.find("median_t") != arg_values.end())
+        median_t = static_cast<uint32_t>(stoi(arg_values["median_t"]));
 
     VideoCapture capture(filename);
     Mat frame;
@@ -117,6 +122,10 @@ int main(int argc, char *argv[]) {
     vector<MotionRegion> current_mr;
     map<uint64_t, uint64_t> mr_id;
 
+    /* by default implement temporal median filter with 3 frames */
+    vector<MvFrame> temp_frames;
+    uint32_t temp_count = 0;
+
     namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
     for (; frame_counter < decoder->index_size(); frame_counter++) {
@@ -127,6 +136,15 @@ int main(int argc, char *argv[]) {
         /* median filter */
         if (median)
             mvs = median_filter(mvs, median);
+
+        /* temporal median filters */
+        if (median_t > 0 && temp_frames.size() < median_t) {
+            temp_frames.emplace_back(mvs);
+        } else if (median_t > 0) {
+            temp_frames[temp_count] = mvs;
+            temp_count = (temp_count + 1) % 3;
+            mvs = median_filter(temp_frames);
+        }
 
         current_mr = mv_partition(mvs, motion_threshold);
         draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
