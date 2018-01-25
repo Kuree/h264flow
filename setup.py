@@ -64,5 +64,6 @@ setup(
     long_description='',
     ext_modules=[CMakeExtension('h264flow')],
     cmdclass=dict(build_ext=CMakeBuild),
+    setup_requires=['numpy'],
     zip_safe=False,
 )

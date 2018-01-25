@@ -187,7 +187,7 @@ uint64_t h264::index_size() {
     }
 }
 
-MvFrame h264::load_frame(uint64_t frame_num) {
+std::pair<MvFrame, bool> h264::load_frame(uint64_t frame_num) {
     std::string nal_data;
     if (bit_stream_) {
         uint64_t pos, size;
@@ -207,13 +207,13 @@ MvFrame h264::load_frame(uint64_t frame_num) {
     ParserContext ctx(sps_, pps_);
     /* test the slice type */
     if (!is_p_slice(static_cast<uint8_t>(nal_data[0])))
-        return MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,
-                       ctx.Height() / 16, false);
+        return std::make_pair(MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,
+                       ctx.Height() / 16, false), false);
     Slice_NALUnit slice(std::move(nal_data));
     slice.parse(ctx);
 
     process_inter_mb(ctx);
-    return MvFrame(ctx);
+    return std::make_pair(MvFrame(ctx), true);
 }
 
 /* adapted from py264 */

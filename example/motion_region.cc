@@ -34,14 +34,14 @@ int main(int argc, char *argv[]) {
     const uint32_t threshold = (uint32_t) stoi(argv[7]);
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
-    auto frame = decoder->load_frame(frame_num);
+    auto pair = decoder->load_frame(frame_num);
+    MvFrame frame = pair.first;
     /* check if the indicated region is within the frame */
     if (rect_y + height > frame.height() || rect_x + width > frame.width())
         throw std::runtime_error("rectangle is outside the range");
 
     /* de-reference shared_ptr as the vector will be copied */
-    CropOperator crop(rect_x / 16, rect_y / 16, width / 16, height / 16,
-                      frame);
+    CropOperator crop(rect_x, rect_y, width, height, frame);
     ThresholdOperator thresh(threshold, crop);
     thresh.execute();
     cout << "Motion in selected region: " << (thresh.result() ? "true"

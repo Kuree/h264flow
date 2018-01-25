@@ -20,6 +20,10 @@
 #include "../src/query/operator.hh"
 #include "../src/model/model-io.hh"
 
+#ifdef OPENCV_ENABLED
+#include "opencvw.hh"
+#endif
+
 namespace py = pybind11;
 
 
@@ -46,13 +50,14 @@ void init_mv_frame(py::module &m) {
                 }
                 return py::array(lst);
             })
-            .def_property_readonly("p_frame", [](MvFrame &mv) { return mv.p_frame(); });
+            .def_property_readonly("p_frame", [](MvFrame &mv)
+            { return mv.p_frame(); });
 }
 
 void init_mv(py::module &m) {
     py::class_<MotionVector>(m, "MotionVector")
-            .def_property_readonly("mvL0", [](MotionVector &mv) { return py::array(2, mv.mvL0);})
-            //.def_property_readonly("mvL1", [](const MotionVector& mv) { return &mv.mvL1; })
+            .def_property_readonly("mvL0", [](MotionVector &mv)
+            { return py::array(2, mv.mvL0);})
             .def_readwrite("x", &MotionVector::x)
             .def_readwrite("y", &MotionVector::y);
 }
@@ -72,6 +77,10 @@ void init_op(py::module &m) {
             .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, Operator&>())
             .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, MvFrame>())
             .def("execute", &ReduceOperator::execute);
+
+    m.def("motion_in_frame", &motion_in_frame);
+    m.def("crop_frame", &crop_frame);
+    m.def("frames_without_motion", &frames_without_motion);
 }
 
 void init_model(py::module &m) {
@@ -103,6 +112,19 @@ void init_model(py::module &m) {
     });
 }
 
+#ifdef OPENCV_ENABLED
+using ShapeContainer = py::detail::any_container<ssize_t>;
+void init_opencv(py::module &m) {
+    py::class_<OpenCV>(m, "OpenCV").def(py::init<const std::string &>())
+            .def("get_next_frame", [](OpenCV& opencv, int frame_num){
+                cv::Mat mat = opencv.get_frame(frame_num);
+                ShapeContainer shape({mat.rows, mat.cols, mat.channels()});
+                return py::array(shape, mat.data);
+            });
+}
+
+#endif
+
 PYBIND11_PLUGIN(h264flow) {
     py::module m("h264flow", "h264flow python binding");
     init_h264(m);
@@ -110,5 +132,8 @@ PYBIND11_PLUGIN(h264flow) {
     init_mv(m);
     init_op(m);
     init_model(m);
+#ifdef OPENCV_ENABLED
+    init_model(m);
+#endif
     return m.ptr();
 }

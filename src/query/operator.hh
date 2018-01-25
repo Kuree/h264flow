@@ -112,8 +112,8 @@ public:
     float x = 0;
     float y = 0;
     uint64_t id;
-    MotionRegion(std::set<MotionVector> mvs);
-    MotionRegion() : MotionRegion(std::set<MotionVector>()) {}
+    explicit MotionRegion(std::set<MotionVector> mvs);
+    explicit MotionRegion() : MotionRegion(std::set<MotionVector>()) {}
 
 private:
     static std::mt19937_64 gen_;
@@ -123,8 +123,14 @@ private:
 inline bool operator==(const MotionRegion &lhs, const MotionRegion &rhs);
 inline bool operator<(const MotionRegion &lhs, const MotionRegion &rhs);
 
+/// Partition the motion vector with given threshold and size requirement
+/// \param frame Motion vector frame.
+/// \param threshold threshold: magnitude^2 of the motion vector.
+/// \param size_threshold minimum macroblocks in a region
+/// \return MotionRegion
 std::vector<MotionRegion> mv_partition(const MvFrame &frame,
-                                                 double threshold);
+                                       double threshold,
+                                       uint32_t size_threshold = 4);
 
 enum MotionType {
     NoMotion = 0,
@@ -152,5 +158,19 @@ std::map<uint64_t, uint64_t> match_motion_region(
 
 std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
         const MotionRegion & region);
+
+std::vector<uint64_t> frames_without_motion(h264 &decoder,
+                                            double threshold,
+                                            uint32_t size_threshold);
+
+std::vector<uint64_t> frames_without_motion(std::unique_ptr<h264> decoder,
+                                            double threshold,
+                                            uint32_t size_threshold);
+
+bool motion_in_frame(const MvFrame &frame, double threshold,
+                     uint32_t size_threshold);
+
+MvFrame crop_frame(const MvFrame& frame, uint32_t x, uint32_t y, uint32_t width,
+                   uint32_t height);
 
 #endif //H264FLOW_OPERATOR_HH

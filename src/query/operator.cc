@@ -36,9 +36,9 @@ void ThresholdOperator::execute() {
 }
 
 void CropOperator::reduce() {
-    MvFrame frame(_width, _height, 16, 16);
-    for (uint32_t y = 0; y < _height; y++) {
-        for (uint32_t x = 0; x < _width; x++) {
+    MvFrame frame(_width,  _height, _width / 16, _height / 16);
+    for (uint32_t y = 0; y < _height / 16; y++) {
+        for (uint32_t x = 0; x < _width / 16; x++) {
             frame.set_mv(x, y, _frame.get_mv(x + _x, y + _y));
         }
     }
@@ -208,7 +208,8 @@ void add_points(std::vector<bool> & visited, std::set<MotionVector> & result,
 }
 
 std::vector<MotionRegion> mv_partition(const MvFrame &frame,
-                                                 double threshold) {
+                                       double threshold,
+                                       uint32_t size_threshold) {
     std::vector<bool> visited = std::vector<bool>(frame.mb_height() *
                                                           frame.mb_width(),
                                               true);
@@ -234,8 +235,7 @@ std::vector<MotionRegion> mv_partition(const MvFrame &frame,
         std::set<MotionVector> s;
         add_points(visited, s, frame, index, frame.mb_width(),
                    frame.mb_height());
-        /* TODO: this this magic number */
-        if (s.size() > 4) {
+        if (s.size() > size_threshold) {
             MotionRegion mr(s);
             result.emplace_back(mr);
         }
@@ -419,4 +419,39 @@ std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
             y_max = mv.y;
     }
     return std::make_tuple(x_min, y_min, x_max, y_max);
+}
+
+
+std::vector<uint64_t> frames_without_motion(std::unique_ptr<h264> decoder,
+                                            double threshold,
+                                            uint32_t size_threshold)
+{ return frames_without_motion(*(decoder.get()), threshold,
+                               size_threshold); }
+
+std::vector<uint64_t> frames_without_motion(h264 &decoder,
+                                            double threshold,
+                                            uint32_t size_threshold) {
+    uint64_t num_of_frames = decoder.index_size();
+    std::vector<uint64_t> result;
+    for (uint64_t i = 0; i < num_of_frames; i++) {
+        bool p_slice;
+        MvFrame frame;
+        std::tie(frame, p_slice) = decoder.load_frame(i);
+        if (p_slice && !motion_in_frame(frame, threshold, size_threshold))
+            result.emplace_back(i);
+    }
+    return result;
+}
+
+bool motion_in_frame(const MvFrame &frame, double threshold,
+                     uint32_t size_threshold) {
+    auto regions = mv_partition(frame, threshold, size_threshold);
+    return !regions.empty();
+}
+
+MvFrame crop_frame(const MvFrame& frame, uint32_t x, uint32_t y, uint32_t width,
+                   uint32_t height) {
+    CropOperator crop(x, y, width, height, frame);
+    crop.execute();
+    return crop.get_frame();
 }

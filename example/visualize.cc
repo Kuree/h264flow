@@ -132,24 +132,27 @@ int main(int argc, char *argv[]) {
         capture >> frame;
         if (frame.empty())
             break;
-        MvFrame mvs = decoder->load_frame(frame_counter);
-        /* median filter */
-        if (median)
-            mvs = median_filter(mvs, median);
+        bool p_slice;
+        MvFrame mvs;
+        tie(mvs, p_slice) = decoder->load_frame(frame_counter);
+        if (p_slice) {
+            /* median filter */
+            if (median)
+                mvs = median_filter(mvs, median);
 
-        /* temporal median filters */
-        if (median_t > 0 && temp_frames.size() < median_t) {
-            temp_frames.emplace_back(mvs);
-        } else if (median_t > 0) {
-            temp_frames[temp_count] = mvs;
-            temp_count = (temp_count + 1) % 3;
-            mvs = median_filter(temp_frames);
+            /* temporal median filters */
+            if (median_t > 0 && temp_frames.size() < median_t) {
+                temp_frames.emplace_back(mvs);
+            } else if (median_t > 0) {
+                temp_frames[temp_count] = mvs;
+                temp_count = (temp_count + 1) % 3;
+                mvs = median_filter(temp_frames);
+            }
+
+            current_mr = mv_partition(mvs, motion_threshold);
+            draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
+            pre_mr = current_mr;
         }
-
-        current_mr = mv_partition(mvs, motion_threshold);
-        draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
-        pre_mr = current_mr;
-
         imshow("video", frame);
         waitKey(10);
     }

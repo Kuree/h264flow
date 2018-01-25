@@ -83,7 +83,7 @@ public:
     explicit h264(std::shared_ptr<BitStream> stream);
 
     void index_nal();
-    MvFrame load_frame(uint64_t frame_num);
+    std::pair<MvFrame, bool> load_frame(uint64_t frame_num);
     uint64_t index_size();
 private:
     uint8_t length_size_ = 4;

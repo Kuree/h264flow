@@ -11,6 +11,10 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
+find_package(OpenCV)
+if (OPENCV_FOUND)
+    add_definitions(-DOPENCV_ENABLED)
+endif()
 
 add_subdirectory(python/pybind11)
 

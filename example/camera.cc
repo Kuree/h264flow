@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
         capture >> frame;
         if (frame.empty())
             break;
-        MvFrame mvs = decoder->load_frame(frame_counter);
+        auto pair = decoder->load_frame(frame_counter);
+        MvFrame mvs = pair.first;
         /* median filter */
         //mvs = median_filter(mvs, 3);
         draw_mv(mvs, frame);

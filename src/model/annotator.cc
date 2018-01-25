@@ -153,7 +153,8 @@ int main(int argc, char *argv[]) {
         capture >> frame;
         if (frame.empty())
             break;
-        MvFrame mvs = decoder->load_frame((uint32_t)frame_num);
+        auto pair = decoder->load_frame((uint32_t)frame_num);
+        MvFrame mvs = pair.first;
         mv_frame = MvFrame(mvs); /* copy constructor */
         draw_mv(mvs, frame);
         imshow("main", frame);
