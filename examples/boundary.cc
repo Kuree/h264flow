@@ -22,7 +22,7 @@
 using namespace cv;
 using namespace std;
 
-#define BAND 100
+#define BAND 50
 
 void draw_mv(MvFrame &mvs, Mat &mat, double threshold, uint32_t s_threshold) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
@@ -94,15 +94,19 @@ int main(int argc, char *argv[]) {
             "default is 4.", false);
     parser.add_arg("-st", "size_threshold", "size threshold in motion region"
             "partition. default is 1.", false);
+    parser.add_arg("-o", "output", "output file", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
 
     string filename = arg_values["input"];
     uint32_t motion_threshold = 4;
+    std::string output_file;
+    uint32_t size_threshold = 1;
+
     if (arg_values.find("threshold") != arg_values.end())
         motion_threshold = (uint32_t)stoi(arg_values["threshold"]);
-    uint32_t size_threshold = 0;
+
     if (arg_values.find("size_threshold") != arg_values.end())
         size_threshold = static_cast<uint32_t>(
                 stoi(arg_values["size_threshold"]));
@@ -112,12 +116,24 @@ int main(int argc, char *argv[]) {
     if (!capture.isOpened())
         throw runtime_error("error in opening " + filename);
 
+    /* setup writer */
+    VideoWriter writer;
+    if (arg_values.find("output") != arg_values.end()) {
+        output_file = arg_values["output"];
+        auto frame_width = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_WIDTH));
+        auto frame_height = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+        double fps = capture.get(CV_CAP_PROP_FPS);
+        writer = VideoWriter(output_file, 0x21, fps,
+                             Size(frame_width, frame_height));
+    } else {
+        namedWindow("video", WINDOW_AUTOSIZE);
+    }
+
     /* open decoder */
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
     vector<MotionRegion> current_mr;
 
-    namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
     for (; frame_counter < decoder->index_size(); frame_counter++) {
         capture >> frame;
@@ -130,12 +146,19 @@ int main(int argc, char *argv[]) {
             current_mr = mv_partition(mvs, motion_threshold);
             draw_mv(mvs, frame, motion_threshold, size_threshold);
         }
-        imshow("video", frame);
-        waitKey(10);
+        if (output_file.empty()) {
+            imshow("video", frame);
+            waitKey(10);
+        }
+        else {
+            writer.write(frame);
+        }
     }
 
     destroyAllWindows();
     capture.release();
+    if (!output_file.empty())
+        writer.release();
 
     return EXIT_SUCCESS;
 }

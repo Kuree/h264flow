@@ -19,5 +19,5 @@ endif()
 add_subdirectory(python/pybind11)
 
 add_subdirectory(src)
-add_subdirectory(example)
+add_subdirectory(examples)
 add_subdirectory(python)
