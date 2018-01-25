@@ -22,8 +22,9 @@
 using namespace cv;
 using namespace std;
 
-void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
-             vector<MotionRegion> &current_mr, map<uint64_t, uint64_t> &mr_id) {
+#define BAND 100
+
+void draw_mv(MvFrame &mvs, Mat &mat, double threshold, uint32_t s_threshold) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
@@ -48,9 +49,33 @@ void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
         }
     }
 
+    auto top_region = crop_frame(mvs, 0, 0, mvs.width(), BAND);
+    auto left_region = crop_frame(mvs, 0, 0, BAND, mvs.height());
+    auto bottom_region = crop_frame(mvs, 0, mvs.height() - BAND,
+                                    mvs.width(), BAND);
+    auto right_region = crop_frame(mvs, mvs.width() - BAND, 0, BAND,
+                                   mvs.height());
+
+    vector<MotionRegion> regions;
+    if (motion_in_frame(top_region, threshold, s_threshold)) {
+        auto r = mv_partition(top_region, threshold, s_threshold);
+        regions.insert(regions.end(), r.begin(), r.end());
+    }
+    if (motion_in_frame(left_region, threshold, s_threshold)) {
+        auto r = mv_partition(left_region, threshold, s_threshold);
+        regions.insert(regions.end(), r.begin(), r.end());
+    }
+    if (motion_in_frame(bottom_region, threshold, s_threshold)) {
+        auto r = mv_partition(bottom_region, threshold, s_threshold);
+        regions.insert(regions.end(), r.begin(), r.end());
+    }
+    if (motion_in_frame(right_region, threshold, s_threshold)) {
+        auto r = mv_partition(right_region, threshold, s_threshold);
+        regions.insert(regions.end(), r.begin(), r.end());
+    }
+
     /* draw the motion region */
-    auto region_matches = match_motion_region(current_mr, pre_mr, 50);
-    for (const auto &s : current_mr) {
+    for (const auto &s : regions) {
         for (const auto &p : s.mvs) {
             if (p.x + 16 > (uint32_t)mat.cols || p.y + 16 > (uint32_t)mat.rows)
                 continue;
@@ -58,56 +83,29 @@ void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
             cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
             float alpha = 0.3;
             addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);
-            /* notice that in the region matches, it's arg1 -> arg2,
-             * so we are good */
-            if (region_matches.find(s.id) != region_matches.end()) {
-                uint64_t old_id = region_matches[s.id];
-                uint64_t id = 0;
-                if (mr_id.find(old_id) != mr_id.end()) {
-                    id = mr_id[old_id];
-                    //mr_id.erase(old_id);
-                    mr_id.insert({s.id, id});
-                } else {
-                    id = mr_id.size();
-                    mr_id.insert({s.id, id});
-                }
-                /* put id label on centroid */
-                Point pt(static_cast<int>(s.x), static_cast<int>(s.y));
-                putText(mat, "ID " + to_string(id), pt,
-                        FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
-            }
         }
-        /* draw the bbox */
-        uint32_t x1, y1, x2, y2;
-        tie(x1, y1, x2, y2) = get_bbox(s);
-        rectangle(mat, Point(x1, y1), Point(x2, y2), Scalar(0, 255, 0), 2);
     }
 }
 
 int main(int argc, char *argv[]) {
-    ArgParser parser("Read motion vectors from a media file "
-                             "and visualize them");
+    ArgParser parser("Check movement in the boundrary");
     parser.add_arg("-i", "input", "media file input");
-    parser.add_arg("-m", "median", "median filter size. set to 0 to disable. "
-            "default is 0.", false);
-    parser.add_arg("-t", "threshold", "threshold to perform motion region partition. "
+    parser.add_arg("-t", "threshold", "energy threshold (x^2 + y^2)."
             "default is 4.", false);
-    parser.add_arg("-M", "median_t", "temporal median filter size. set to 0 to disable."
-            " default is 0", false);
+    parser.add_arg("-st", "size_threshold", "size threshold in motion region"
+            "partition. default is 1.", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
 
     string filename = arg_values["input"];
-    uint32_t median = 0;
-    if (arg_values.find("median") != arg_values.end())
-        median = (uint32_t)stoi(arg_values["median"]);
     uint32_t motion_threshold = 4;
     if (arg_values.find("threshold") != arg_values.end())
         motion_threshold = (uint32_t)stoi(arg_values["threshold"]);
-    uint32_t median_t = 0;
-    if (arg_values.find("median_t") != arg_values.end())
-        median_t = static_cast<uint32_t>(stoi(arg_values["median_t"]));
+    uint32_t size_threshold = 0;
+    if (arg_values.find("size_threshold") != arg_values.end())
+        size_threshold = static_cast<uint32_t>(
+                stoi(arg_values["size_threshold"]));
 
     VideoCapture capture(filename);
     Mat frame;
@@ -117,14 +115,7 @@ int main(int argc, char *argv[]) {
     /* open decoder */
     unique_ptr<h264> decoder = make_unique<h264>(filename);
 
-    /* motion region information*/
-    vector<MotionRegion> pre_mr;
     vector<MotionRegion> current_mr;
-    map<uint64_t, uint64_t> mr_id;
-
-    /* by default implement temporal median filter with 3 frames */
-    vector<MvFrame> temp_frames;
-    uint32_t temp_count = 0;
 
     namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
@@ -136,22 +127,8 @@ int main(int argc, char *argv[]) {
         MvFrame mvs;
         tie(mvs, p_slice) = decoder->load_frame(frame_counter);
         if (p_slice) {
-            /* median filter */
-            if (median)
-                mvs = median_filter(mvs, median);
-
-            /* temporal median filters */
-            if (median_t > 0 && temp_frames.size() < median_t) {
-                temp_frames.emplace_back(mvs);
-            } else if (median_t > 0) {
-                temp_frames[temp_count] = mvs;
-                temp_count = (temp_count + 1) % 3;
-                mvs = median_filter(temp_frames);
-            }
-
             current_mr = mv_partition(mvs, motion_threshold);
-            draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
-            pre_mr = current_mr;
+            draw_mv(mvs, frame, motion_threshold, size_threshold);
         }
         imshow("video", frame);
         waitKey(10);

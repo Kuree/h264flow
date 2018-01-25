@@ -13,6 +13,14 @@ if (OPENCV_FOUND)
     add_executable(camera camera.cc)
     target_link_libraries(camera h264)
     target_link_libraries(camera ${OpenCV_LIBS})
+
+    add_executable(boundary boundary.cc)
+    target_link_libraries(boundary h264)
+    target_link_libraries(boundary ${OpenCV_LIBS})
+
+    add_executable(save_mv save_mv.cc)
+    target_link_libraries(save_mv h264)
+    target_link_libraries(save_mv ${OpenCV_LIBS})
 else()
     MESSAGE(WARNING
             "OpenCV not found. executables will not be built")

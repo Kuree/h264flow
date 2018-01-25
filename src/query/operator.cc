@@ -421,13 +421,6 @@ std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
     return std::make_tuple(x_min, y_min, x_max, y_max);
 }
 
-
-std::vector<uint64_t> frames_without_motion(std::unique_ptr<h264> decoder,
-                                            double threshold,
-                                            uint32_t size_threshold)
-{ return frames_without_motion(*(decoder.get()), threshold,
-                               size_threshold); }
-
 std::vector<uint64_t> frames_without_motion(h264 &decoder,
                                             double threshold,
                                             uint32_t size_threshold) {

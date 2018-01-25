@@ -82,7 +82,7 @@ public:
                                  _width(width), _height(height) {}
     CropOperator(const uint32_t x, const uint32_t y, const uint32_t width, const uint32_t height,
                  MvFrame frame)
-            : ReduceOperator(frame), _x(x), _y(y), _width(width),
+            : ReduceOperator(frame), _x(x / 16), _y(y / 16), _width(width),
               _height(height) {}
 
 protected:
@@ -160,10 +160,6 @@ std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
         const MotionRegion & region);
 
 std::vector<uint64_t> frames_without_motion(h264 &decoder,
-                                            double threshold,
-                                            uint32_t size_threshold);
-
-std::vector<uint64_t> frames_without_motion(std::unique_ptr<h264> decoder,
                                             double threshold,
                                             uint32_t size_threshold);
 
