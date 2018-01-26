@@ -111,9 +111,10 @@ public:
     /* those are centroid */
     float x = 0;
     float y = 0;
-    uint64_t id;
+    uint64_t id = 0;
     explicit MotionRegion(std::set<MotionVector> mvs);
     explicit MotionRegion() : MotionRegion(std::set<MotionVector>()) {}
+    explicit MotionRegion(const MotionRegion &r);
 
 private:
     static std::mt19937_64 gen_;
@@ -153,7 +154,8 @@ std::map<MotionType, bool> CategorizeCameraMotion(
 std::set<MotionVector> background_filter(const MvFrame & frame);
 
 std::map<uint64_t, uint64_t> match_motion_region(
-        std::vector<MotionRegion> regions1, std::vector<MotionRegion> regions2,
+        const std::vector<MotionRegion> &regions1,
+        const std::vector<MotionRegion> &regions2,
         float threshold);
 
 std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
@@ -168,5 +170,9 @@ bool motion_in_frame(const MvFrame &frame, double threshold,
 
 MvFrame crop_frame(const MvFrame& frame, uint32_t x, uint32_t y, uint32_t width,
                    uint32_t height);
+
+
+void temporal_mv_partition(std::vector<MotionRegion> &current_frame,
+                           const std::vector<MotionRegion> &previous_frame);
 
 #endif //H264FLOW_OPERATOR_HH

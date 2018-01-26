@@ -19,6 +19,8 @@
 
 #include "mp4.hh"
 
+#define MACROBLOCK_SIZE 16
+
 class BitStream {
 public:
     explicit BitStream(std::string filename);
@@ -35,7 +37,7 @@ private:
 };
 
 struct MotionVector {
-    float mvL0[2] = {0, 0};
+    mutable float mvL0[2] = {0, 0};
     uint32_t x = 0;
     uint32_t y = 0;
     uint32_t energy = 0;

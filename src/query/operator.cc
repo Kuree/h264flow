@@ -360,8 +360,12 @@ std::mt19937_64 MotionRegion::gen_ = std::mt19937_64(std::random_device()());
 std::uniform_int_distribution<unsigned long long> MotionRegion::dis_ =
         std::uniform_int_distribution<unsigned long long>();
 
+MotionRegion::MotionRegion(const MotionRegion &r) : MotionRegion(r.mvs) {
+    id = r.id;
+}
 
 std::pair<float, float> compute_centroid(const std::set<MotionVector> &set) {
+    //if (set.empty()) return;
     float sum_x = 0, sum_y = 0;
     for (const auto &mv : set) {
         sum_x += mv.x;
@@ -381,7 +385,8 @@ MotionRegion::MotionRegion(std::set<MotionVector> mvs)
 }
 
 std::map<uint64_t, uint64_t> match_motion_region(
-        std::vector<MotionRegion> regions1, std::vector<MotionRegion> regions2,
+        const std::vector<MotionRegion> &regions1,
+        const std::vector<MotionRegion> &regions2,
         float threshold) {
     /* TODO: optimize this */
     std::map<uint64_t, uint64_t> result;
@@ -418,7 +423,8 @@ std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_bbox(
         if (mv.y > y_max)
             y_max = mv.y;
     }
-    return std::make_tuple(x_min, y_min, x_max, y_max);
+    return std::make_tuple(x_min, y_min, x_max + MACROBLOCK_SIZE,
+                           y_max + MACROBLOCK_SIZE);
 }
 
 std::vector<uint64_t> frames_without_motion(h264 &decoder,
@@ -447,4 +453,86 @@ MvFrame crop_frame(const MvFrame& frame, uint32_t x, uint32_t y, uint32_t width,
     CropOperator crop(x, y, width, height, frame);
     crop.execute();
     return crop.get_frame();
+}
+
+inline std::pair<double, double> mean_velocity(const MotionRegion &r) {
+    double x = 0;
+    double y = 0;
+    for (auto const & mv : r.mvs) {
+        x += mv.mvL0[0];
+        y += mv.mvL0[1];
+    }
+    return std::make_pair(x / r.mvs.size(), y / r.mvs.size());
+}
+
+template<typename T>
+inline std::set<T> set_diff(const std::set<T> &set1,
+                                 const std::set<T> &set2) {
+    std::set<T> result;
+    for (const auto & e : set1)
+        if (set2.find(e) != set2.end())
+            result.insert(e);
+    return result;
+}
+
+/* r2 will move based on its mean velocity */
+std::pair<MotionRegion, bool> merge_detection(const MotionRegion &r1,
+                                                    const MotionRegion &r2,
+                                                    double fraction = 0.9) {
+    /* compute velocity */
+    double x, y;
+    std::tie(x, y) = mean_velocity(r2);
+    auto dx = static_cast<int>(x / MACROBLOCK_SIZE);
+    auto dy = static_cast<int>(y / MACROBLOCK_SIZE);
+    MotionRegion r;
+    if (dx || dy) {
+        /* move r2 with the velocity */
+        r = MotionRegion(r2);
+        for (auto &mv : r.mvs) {
+            mv.mvL0[0] += dx;
+            mv.mvL0[1] += dy;
+        }
+    } else {
+        r = r2;
+    }
+    auto common = set_diff<MotionVector>(r1.mvs, r2.mvs);
+    double size = common.size();
+    return std::make_pair(MotionRegion(common),
+                          size >= r1.mvs.size() * fraction
+                          || size >= r2.mvs.size() * fraction);
+
+}
+
+/* TODO: fix this. currently not working */
+void temporal_mv_partition(std::vector<MotionRegion> &current_frame,
+                           const std::vector<MotionRegion> &previous_frame) {
+    /* main assumptions:
+     *      1. an object won't disappear in the middle of the movement
+     *      2. sequences are temporally invariant, that is, it doesn't matter
+     *         if it's played forward or backward.
+     * limitations:
+     *      1. if two objects are close to each other within all the sequences,
+     *         then this method will not work since in motion vector's domain,
+     *         there is no difference between these two objects
+     * */
+
+    /* only implement forward partition */
+    std::set<MotionRegion> region_to_delete;
+    std::set<MotionRegion> region_to_add;
+    for (const auto &r1 : current_frame) {
+        for (const auto &r2 : previous_frame) {
+            auto result = merge_detection(r1, r2);
+            if (result.second) {
+                region_to_add.insert(result.first);
+                region_to_delete.insert(r1);
+            }
+        }
+    }
+    for (const auto &r : region_to_add)
+        current_frame.emplace_back(r);
+    for (const auto &r : region_to_delete) {
+        current_frame.erase(std::remove(current_frame.begin(),
+                                        current_frame.end(), r),
+                            current_frame.end());
+    }
 }

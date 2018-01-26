@@ -16,6 +16,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 #include "../src/decoder/h264.hh"
 #include "../src/query/operator.hh"
 #include "../src/model/model-io.hh"
@@ -78,9 +79,15 @@ void init_op(py::module &m) {
             .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, MvFrame>())
             .def("execute", &ReduceOperator::execute);
 
+    py::class_<MotionRegion>(m, "MotionRegion")
+            .def_readwrite("x", &MotionRegion::x)
+            .def_readwrite("y", &MotionRegion::y);
+
     m.def("motion_in_frame", &motion_in_frame);
     m.def("crop_frame", &crop_frame);
     m.def("frames_without_motion", &frames_without_motion);
+    m.def("mv_partition", &mv_partition);
+    m.def("get_bbox", &get_bbox);
 }
 
 void init_model(py::module &m) {
