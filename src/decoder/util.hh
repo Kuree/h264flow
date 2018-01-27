@@ -71,6 +71,6 @@ int MbPredLuma(uint64_t mb_type);
 
 int MbPredChroma(uint64_t mb_type);
 
-bool is_p_slice(uint8_t first_byte);
+bool is_p_slice(uint8_t first_byte, uint8_t second_byte);
 
 #endif //H264FLOW_UTIL_HH

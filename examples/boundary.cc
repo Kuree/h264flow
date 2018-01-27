@@ -88,7 +88,7 @@ void draw_mv(MvFrame &mvs, Mat &mat, double threshold, uint32_t s_threshold) {
 }
 
 int main(int argc, char *argv[]) {
-    ArgParser parser("Check movement in the boundrary");
+    ArgParser parser("Check movement in the boundary");
     parser.add_arg("-i", "input", "media file input");
     parser.add_arg("-t", "threshold", "energy threshold (x^2 + y^2)."
             "default is 4.", false);

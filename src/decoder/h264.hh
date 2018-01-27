@@ -36,11 +36,13 @@ private:
     std::vector<std::pair<uint64_t, uint64_t>> chunk_offsets_;
 };
 
+
 struct MotionVector {
     mutable float mvL0[2] = {0, 0};
     uint32_t x = 0;
     uint32_t y = 0;
     uint32_t energy = 0;
+    uint32_t mb_type = P_Skip;
 };
 
 class MvFrame {
@@ -66,6 +68,7 @@ public:
     inline std::vector<MotionVector> operator[](const uint32_t &y) const
     { return std::vector<MotionVector>(&mvs_[y * mb_width_],
                                        &mvs_[(y + 1) * mb_width_]); }
+    inline std::vector<MotionVector> get_mvs() const  { return mvs_; }
 
     inline bool p_frame() const { return p_frame_; }
 

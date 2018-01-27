@@ -21,6 +21,10 @@ if (OPENCV_FOUND)
     add_executable(save_mv save_mv.cc)
     target_link_libraries(save_mv h264)
     target_link_libraries(save_mv ${OpenCV_LIBS})
+
+    add_executable(scenecut scenecut.cc)
+    target_link_libraries(scenecut h264)
+    target_link_libraries(scenecut ${OpenCV_LIBS})
 else()
     MESSAGE(WARNING
             "OpenCV not found. executables will not be built")

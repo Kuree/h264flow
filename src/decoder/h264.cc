@@ -206,7 +206,8 @@ std::pair<MvFrame, bool> h264::load_frame(uint64_t frame_num) {
     }
     ParserContext ctx(sps_, pps_);
     /* test the slice type */
-    if (!is_p_slice(static_cast<uint8_t>(nal_data[0])))
+    if (!is_p_slice(static_cast<uint8_t>(nal_data[0]),
+                    static_cast<uint8_t>(nal_data[1])))
         return std::make_pair(MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,
                        ctx.Height() / 16, false), false);
     Slice_NALUnit slice(std::move(nal_data));
@@ -448,6 +449,8 @@ MvFrame::MvFrame(ParserContext &ctx) : mvs_() {
                     -mb->mvL[0][0][0][1] / 4.0f,
                     mb->pos_x() * 16,
                     mb->pos_y() * 16,
+                    0,
+                    static_cast<uint32_t>(mb->mb_type)
             };
             mv.energy = uint32_t(mv.mvL0[0] * mv.mvL0[0] +
                                          mv.mvL0[1] * mv.mvL0[1]);

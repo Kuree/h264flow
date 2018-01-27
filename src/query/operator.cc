@@ -21,6 +21,9 @@
 #include <iterator>
 #include <set>
 #include "operator.hh"
+#include "../decoder/util.hh"
+#include "../decoder/consts.hh"
+
 
 void ThresholdOperator::execute() {
     BooleanOperator::execute();
@@ -535,4 +538,30 @@ void temporal_mv_partition(std::vector<MotionRegion> &current_frame,
                                         current_frame.end(), r),
                             current_frame.end());
     }
+}
+
+bool is_scene_cut(const MvFrame &frame, float threshold) {
+    /* assumptions made here:
+     * 1. because we use --ref 0 in x264, all P-slices only have one reference
+     * frame, that is, the previous on. Therefore, a I-slice is a very good
+     * indication of scene.
+     * 2. in addition to I-slices, if the majority of the macroblocks are intra,
+     * it is also a good indication of scene cut.
+     * */
+    uint32_t count = 0;
+    for (const auto &mv : frame.get_mvs()) {
+        if (is_mb_intra(mv.mb_type, 0))
+            ++count;
+    }
+    bool yes = count >= (frame.get_mvs().size() * threshold);
+    return yes;
+}
+
+bool is_scene_cut(h264 &decoder, uint32_t frame_num, float threshold) {
+    auto pair = decoder.load_frame(frame_num);
+    /* we trust x264 is going to make a good guess for scene cut detection */
+    if (pair.second)
+        return is_scene_cut(pair.first, threshold);
+    else
+        return true;
 }
