@@ -20,9 +20,13 @@
 #include <numeric>
 #include <iterator>
 #include <set>
+#include <deque>
+#include <functional>
 #include "operator.hh"
 #include "../decoder/util.hh"
 #include "../decoder/consts.hh"
+
+typedef std::chrono::high_resolution_clock Clock;
 
 
 void ThresholdOperator::execute() {
@@ -540,7 +544,8 @@ void temporal_mv_partition(std::vector<MotionRegion> &current_frame,
     }
 }
 
-bool is_scene_cut(const MvFrame &frame, float threshold) {
+bool is_scene_cut(std::vector<std::shared_ptr<MacroBlock>> mvs,
+                  float threshold) {
     /* assumptions made here:
      * 1. because we use --ref 0 in x264, all P-slices only have one reference
      * frame, that is, the previous on. Therefore, a I-slice is a very good
@@ -549,19 +554,97 @@ bool is_scene_cut(const MvFrame &frame, float threshold) {
      * it is also a good indication of scene cut.
      * */
     uint32_t count = 0;
-    for (const auto &mv : frame.get_mvs()) {
-        if (is_mb_intra(mv.mb_type, 0))
+    for (const auto &mb : mvs) {
+        if (is_mb_intra(mb->mb_type, 0))
             ++count;
     }
-    bool yes = count >= (frame.get_mvs().size() * threshold);
-    return yes;
+    return count >= (mvs.size() * threshold);
 }
 
 bool is_scene_cut(h264 &decoder, uint32_t frame_num, float threshold) {
-    auto pair = decoder.load_frame(frame_num);
+    auto mvs = decoder.get_raw_mb(frame_num);
     /* we trust x264 is going to make a good guess for scene cut detection */
-    if (pair.second)
-        return is_scene_cut(pair.first, threshold);
+    if (!mvs.empty())
+        return is_scene_cut(mvs, threshold);
     else
         return true;
+}
+
+std::vector<bool> index_scene_cut(h264 &decoder, float threshold) {
+    std::vector<bool> first_pass_result(decoder.index_size());
+    auto start = Clock::now();
+    const uint64_t total_frames = first_pass_result.size();
+    /* first pass */
+    for (uint32_t frame_num = 0; frame_num < total_frames; frame_num++) {
+        try {
+            first_pass_result[frame_num] =
+                    is_scene_cut(decoder, frame_num, threshold);
+        } catch (std::runtime_error &ex) {
+            std::cerr << "Unable to decode frame " << frame_num << std::endl
+                      << "Error: " << ex.what() << std::endl;
+        }
+        if (frame_num % 100 == 99) {
+            auto end = Clock::now();
+            auto time_used = std::chrono::duration_cast<
+                    std::chrono::milliseconds>(end - start).count();
+            std::cerr << '\r' << frame_num << "/" <<total_frames
+                      << " speed: " << (1e5f / time_used);
+            start = end;
+        }
+    }
+    std::cerr << '\r';
+    /* second pass */
+    const uint32_t window_size = 10;
+    std::deque<int> frame_queue;
+    std::vector<bool> second_pass_result(first_pass_result.size());
+    uint64_t counter = 0;
+    int sum = 0;
+    for (uint32_t frame_num = 0; frame_num < total_frames; frame_num++) {
+        if (frame_queue.size() < window_size) {
+            int value = first_pass_result[frame_num];
+            frame_queue.push_back(value);
+            sum += value;
+        } else {
+            int new_value = first_pass_result[frame_num];
+            if (!sum) { /* window clean */
+                second_pass_result[counter++] = false;
+                /* the value is 0 */
+                frame_queue.pop_front();
+                frame_queue.push_back(new_value);
+                sum += new_value;
+            } else {
+                if (new_value) {
+                    /* new values pop in the frame, therefore *zero* out
+                     * all the values in the queue */
+                    second_pass_result[counter++] = false;
+                    int old_value = frame_queue.front();
+                    frame_queue.pop_front();
+                    frame_queue.push_back(new_value);
+                    sum += new_value - old_value;
+                } else {
+                    int old_value = frame_queue.front();
+                    /* be careful since we want the last 1 to be stored */
+                    if (old_value == sum) {
+                        second_pass_result[counter++] = true;
+                        frame_queue.pop_front();
+                        sum = 0;
+                    } else {
+                        second_pass_result[counter++] = false;
+                        frame_queue.pop_front();
+                        sum -= old_value;
+                    }
+                    frame_queue.push_back(new_value);
+                }
+            }
+        }
+    }
+
+    while(!frame_queue.empty()) {
+        second_pass_result[counter++] = frame_queue.front();
+        frame_queue.pop_front();
+    }
+    if (counter != total_frames)
+        throw std::runtime_error("incorrect state in scene cut calculation");
+
+    return second_pass_result;
 }

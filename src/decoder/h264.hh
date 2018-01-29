@@ -89,6 +89,7 @@ public:
 
     void index_nal();
     std::pair<MvFrame, bool> load_frame(uint64_t frame_num);
+    std::vector<std::shared_ptr<MacroBlock>> get_raw_mb(uint64_t frame_num);
     uint64_t index_size();
 private:
     uint8_t length_size_ = 4;
@@ -115,6 +116,8 @@ private:
 
     void load_bitstream();
     void load_mp4();
+
+    std::unique_ptr<ParserContext> get_ctx(uint64_t frame_num);
 };
 
 

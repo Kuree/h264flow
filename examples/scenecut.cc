@@ -72,26 +72,23 @@ int main(int argc, char *argv[]) {
 
     vector<MotionRegion> current_mr;
 
-    for (uint32_t frame_counter = 0; frame_counter < decoder.index_size();
+    auto scene_cuts = index_scene_cut(decoder, threshold);
+
+    for (uint32_t frame_counter = 0; frame_counter < scene_cuts.size();
          frame_counter++) {
         capture >> frame;
         if (frame.empty())
             break;
 
-        try {
-            if (is_scene_cut(decoder, frame_counter, threshold)) {
-                Mat mat(frame.rows, frame.cols, frame.type(),
-                        Scalar(0, 0, 255));
-                float alpha = 0.3;
-                addWeighted(mat, alpha, frame, 1 - alpha, 0.0, frame);
+        if (scene_cuts[frame_counter]) {
+            Mat mat(frame.rows, frame.cols, frame.type(),
+                    Scalar(0, 0, 255));
+            float alpha = 0.3;
+            addWeighted(mat, alpha, frame, 1 - alpha, 0.0, frame);
 
-                for (int i = 0; i < 20; i++) {
-                    output_frame(frame, writer, !output_file.empty());
-                }
+            for (int i = 0; i < 20; i++) {
+                output_frame(frame, writer, !output_file.empty());
             }
-        } catch (std::runtime_error & error) {
-            cerr << "Unable to decode frame " << frame_counter << endl
-                 << "Error: " << error.what() << endl;
         }
         output_frame(frame, writer, !output_file.empty());
     }

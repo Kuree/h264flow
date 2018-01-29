@@ -20,6 +20,7 @@
 #include <set>
 #include <map>
 #include <random>
+#include <chrono>
 #include "../decoder/h264.hh"
 
 
@@ -175,7 +176,10 @@ MvFrame crop_frame(const MvFrame& frame, uint32_t x, uint32_t y, uint32_t width,
 void temporal_mv_partition(std::vector<MotionRegion> &current_frame,
                            const std::vector<MotionRegion> &previous_frame);
 
-bool is_scene_cut(const MvFrame &frame, float threshold);
+bool is_scene_cut(std::vector<std::shared_ptr<MacroBlock>> mvs,
+             float threshold);
 
 bool is_scene_cut(h264 &decoder, uint32_t frame_num, float threshold = 0.5);
+
+std::vector<bool> index_scene_cut(h264 &decoder, float threshold = 0.5);
 #endif //H264FLOW_OPERATOR_HH

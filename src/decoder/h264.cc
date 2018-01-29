@@ -187,7 +187,8 @@ uint64_t h264::index_size() {
     }
 }
 
-std::pair<MvFrame, bool> h264::load_frame(uint64_t frame_num) {
+
+std::unique_ptr<ParserContext> h264::get_ctx(uint64_t frame_num) {
     std::string nal_data;
     if (bit_stream_) {
         uint64_t pos, size;
@@ -202,19 +203,40 @@ std::pair<MvFrame, bool> h264::load_frame(uint64_t frame_num) {
         BinaryReader br(stream);
         uint64_t unit_size = read_nal_size(br);
         nal_data = mp4_->extract_stream(offset + length_size_,
-                                                    unit_size);
+                                        unit_size);
     }
-    ParserContext ctx(sps_, pps_);
+    std::unique_ptr<ParserContext> ctx =
+            std::make_unique<ParserContext>(sps_, pps_);
     /* test the slice type */
     if (!is_p_slice(static_cast<uint8_t>(nal_data[0]),
                     static_cast<uint8_t>(nal_data[1])))
-        return std::make_pair(MvFrame(ctx.Width(), ctx.Height(), ctx.Width() / 16,
-                       ctx.Height() / 16, false), false);
+        return nullptr;
     Slice_NALUnit slice(std::move(nal_data));
-    slice.parse(ctx);
+    /* TODO: fix this, although this is fine in memory management */
+    slice.parse(*ctx);
+    return ctx;
+}
 
-    process_inter_mb(ctx);
-    return std::make_pair(MvFrame(ctx), true);
+std::pair<MvFrame, bool> h264::load_frame(uint64_t frame_num) {
+    auto ctx = get_ctx(frame_num);
+    if (!ctx) {
+        ParserContext c(sps_, pps_);
+        return std::make_pair(MvFrame(c.Width(), c.Height(),
+                                      c.Width() / MACROBLOCK_SIZE,
+                                      c.Height() / MACROBLOCK_SIZE, false),
+                              false);
+    }
+
+    process_inter_mb(*ctx);
+    return std::make_pair(MvFrame(*ctx), true);
+}
+
+std::vector<std::shared_ptr<MacroBlock>> h264::get_raw_mb(uint64_t frame_num) {
+    auto ctx = get_ctx(frame_num);
+    if (ctx)
+        return ctx->mb_array;
+    else
+        return std::vector<std::shared_ptr<MacroBlock>>();
 }
 
 /* adapted from py264 */
