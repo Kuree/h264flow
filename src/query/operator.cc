@@ -594,7 +594,7 @@ std::vector<bool> index_scene_cut(h264 &decoder, float threshold) {
     }
     std::cerr << '\r';
     /* second pass */
-    const uint32_t window_size = 10;
+    const uint32_t window_size = 20;
     std::deque<int> frame_queue;
     std::vector<bool> second_pass_result(first_pass_result.size());
     uint64_t counter = 0;

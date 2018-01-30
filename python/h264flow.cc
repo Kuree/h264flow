@@ -88,6 +88,7 @@ void init_op(py::module &m) {
     m.def("frames_without_motion", &frames_without_motion);
     m.def("mv_partition", &mv_partition);
     m.def("get_bbox", &get_bbox);
+    m.def("index_scene_cut", &index_scene_cut);
 }
 
 void init_model(py::module &m) {
