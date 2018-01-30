@@ -23,7 +23,8 @@ using namespace cv;
 using namespace std;
 
 void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
-             vector<MotionRegion> &current_mr, map<uint64_t, uint64_t> &mr_id) {
+             vector<MotionRegion> &current_mr, map<uint64_t, uint64_t> &mr_id,
+             bool tracking) {
     for (uint32_t y = 0; y < mvs.mb_height(); y++) {
         for (uint32_t x = 0; x < mvs.mb_width(); x++) {
             auto mv = mvs.get_mv(x, y);
@@ -58,23 +59,25 @@ void draw_mv(MvFrame &mvs, Mat &mat, vector<MotionRegion> &pre_mr,
             cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 0));
             float alpha = 0.3;
             addWeighted(color, alpha, roi, 1 - alpha, 0.0, roi);
-            /* notice that in the region matches, it's arg1 -> arg2,
-             * so we are good */
-            if (region_matches.find(s.id) != region_matches.end()) {
-                uint64_t old_id = region_matches[s.id];
-                uint64_t id = 0;
-                if (mr_id.find(old_id) != mr_id.end()) {
-                    id = mr_id[old_id];
-                    //mr_id.erase(old_id);
-                    mr_id.insert({s.id, id});
-                } else {
-                    id = mr_id.size();
-                    mr_id.insert({s.id, id});
+            if (tracking) {
+                /* notice that in the region matches, it's arg1 -> arg2,
+                 * so we are good */
+                if (region_matches.find(s.id) != region_matches.end()) {
+                    uint64_t old_id = region_matches[s.id];
+                    uint64_t id = 0;
+                    if (mr_id.find(old_id) != mr_id.end()) {
+                        id = mr_id[old_id];
+                        //mr_id.erase(old_id);
+                        mr_id.insert({s.id, id});
+                    } else {
+                        id = mr_id.size();
+                        mr_id.insert({s.id, id});
+                    }
+                    /* put id label on centroid */
+                    Point pt(static_cast<int>(s.x), static_cast<int>(s.y));
+                    putText(mat, "ID " + to_string(id), pt,
+                            FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
                 }
-                /* put id label on centroid */
-                Point pt(static_cast<int>(s.x), static_cast<int>(s.y));
-                putText(mat, "ID " + to_string(id), pt,
-                        FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 0), 4);
             }
         }
         /* draw the bbox */
@@ -94,6 +97,9 @@ int main(int argc, char *argv[]) {
             "default is 4.", false);
     parser.add_arg("-M", "median_t", "temporal median filter size. set to 0 to disable."
             " default is 0", false);
+    parser.add_arg("-T", "tracking", "enable object tracking. set to 0 to disable."
+            "default is 1", false);
+    parser.add_arg("-o", "output", "output file", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
@@ -108,8 +114,24 @@ int main(int argc, char *argv[]) {
     uint32_t median_t = 0;
     if (arg_values.find("median_t") != arg_values.end())
         median_t = static_cast<uint32_t>(stoi(arg_values["median_t"]));
+    bool obj_tracking = true;
+    if (arg_values.find("tracking") != arg_values.end())
+        obj_tracking = static_cast<bool>(stoi(arg_values["tracking"]));
+
 
     VideoCapture capture(filename);
+
+    string output_filename;
+    if (arg_values.find("output") != arg_values.end())
+        output_filename = arg_values["output"];
+    VideoWriter writer;
+    if (!filename.empty()) {
+        auto frame_width = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_WIDTH));
+        auto frame_height = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+        double fps = capture.get(CV_CAP_PROP_FPS);
+        writer = VideoWriter(output_filename, 0x21, fps, Size(frame_width, frame_height));
+    }
+
     Mat frame;
     if (!capture.isOpened())
         throw runtime_error("error in opening " + filename);
@@ -125,8 +147,9 @@ int main(int argc, char *argv[]) {
     /* by default implement temporal median filter with 3 frames */
     vector<MvFrame> temp_frames;
     uint32_t temp_count = 0;
-
-    namedWindow("video", WINDOW_AUTOSIZE);
+    bool show_video = output_filename.empty();
+    if (show_video)
+        namedWindow("video", WINDOW_AUTOSIZE);
     uint32_t frame_counter = 0;
     for (; frame_counter < decoder->index_size(); frame_counter++) {
         capture >> frame;
@@ -150,15 +173,24 @@ int main(int argc, char *argv[]) {
             }
 
             current_mr = mv_partition(mvs, motion_threshold);
-            draw_mv(mvs, frame, pre_mr, current_mr, mr_id);
+            draw_mv(mvs, frame, pre_mr, current_mr, mr_id, obj_tracking);
             pre_mr = current_mr;
         }
-        imshow("video", frame);
-        waitKey(10);
+        if (show_video) {
+            waitKey(10);
+            imshow("video", frame);
+        } else {
+            writer.write(frame);
+        }
     }
 
-    destroyAllWindows();
+    if (show_video)
+        destroyAllWindows();
+    else
+        writer.release();
+
     capture.release();
+
 
     return EXIT_SUCCESS;
 }
