@@ -69,8 +69,8 @@ LibAvFlow::decode_pkt(const AVPacket *pkt) {
         if (ret >= 0) {
             AVFrameSideData *sd;
             video_frame_count++;
-            auto height = static_cast<uint32_t>(frame->height);
-            auto width = static_cast<uint32_t>(frame->width);
+            height = static_cast<uint32_t>(frame->height);
+            width = static_cast<uint32_t>(frame->width);
             result = std::vector<std::vector<std::pair<int, int>>>(height,
                     std::vector<std::pair<int, int>>(width));
 
@@ -103,9 +103,9 @@ void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
                                    enum AVMediaType type) {
     int ret;
     AVStream *st;
-    AVCodecContext *dec_ctx = NULL;
-    AVCodec *dec = NULL;
-    AVDictionary *opts = NULL;
+    AVCodecContext *dec_ctx = nullptr;
+    AVCodec *dec = nullptr;
+    AVDictionary *opts = nullptr;
 
     ret = av_find_best_stream(fmt_ctx, type, -1, -1, &dec, 0);
     if (ret < 0) {
@@ -149,7 +149,7 @@ LibAvFlow::~LibAvFlow() {
 }
 
 std::vector<std::vector<std::pair<int, int>>> LibAvFlow::get_mv() {
-    AVPacket pkt = {0};
+    AVPacket pkt = {nullptr};
     std::vector<std::vector<std::pair<int, int>>> result;
     int old_frame_num = video_frame_count;
     while (av_read_frame(fmt_ctx, &pkt) >= 0) {
@@ -161,4 +161,14 @@ std::vector<std::vector<std::pair<int, int>>> LibAvFlow::get_mv() {
         }
     }
     return result;
+}
+
+std::vector<uint8_t> LibAvFlow::get_luma() {
+    if (!frame) {
+        return std::vector<uint8_t>();
+    }
+    int line_size = frame->linesize[0];
+    if (width != line_size)
+        throw std::runtime_error("line size does not equal to width");
+    return std::vector<uint8_t>(frame->data, frame->data + width * height);
 }

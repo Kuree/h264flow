@@ -31,17 +31,23 @@ public:
     explicit LibAvFlow(const std::string &filename);
 
     std::vector<std::vector<std::pair<int, int>>> get_mv();
+    /* return in raster order. has be called after MV is obtained */
+    /* TODO: fix this */
+    std::vector<uint8_t > get_luma();
 
     ~LibAvFlow();
 
 private:
-    AVFormatContext *fmt_ctx = NULL;
-    AVCodecContext *video_dec_ctx = NULL;
-    AVStream *video_stream = NULL;
+    AVFormatContext *fmt_ctx = nullptr;
+    AVCodecContext *video_dec_ctx = nullptr;
+    AVStream *video_stream = nullptr;
 
     int video_stream_idx = -1;
     AVFrame *frame = NULL;
     int video_frame_count = 0;
+
+    int height = 0;
+    int width = 0;
 
     void clean_up();
 

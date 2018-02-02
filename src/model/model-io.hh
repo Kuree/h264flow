@@ -34,4 +34,7 @@ void dump_processed_mv(const MvFrame &frame, uint32_t label,
 
 std::vector<double> load_processed_mv(const std::string & filename,
                                       uint32_t &label);
+
+void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
+             const std::vector<uint8_t> luma, std::string filename);
 #endif //H264FLOW_MODEL_IO_HH

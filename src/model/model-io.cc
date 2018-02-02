@@ -130,3 +130,9 @@ void load_label(uint32_t label, bool &left, bool &right, bool &up, bool &down,
     zoom_in = (label & 1 << 4) != 0;
     zoom_out = (label & 1 << 5) != 0;
 }
+
+void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
+             const std::vector<uint8_t> luma, std::string filename) {
+    std::ofstream stream;
+    stream.open(filename.c_str(), std::ios::trunc | std::ios::binary);
+}
