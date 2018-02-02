@@ -6,9 +6,15 @@ addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
+    - sourceline: 'ppa:jonathonf/ffmpeg-3'
     packages:
     - gcc-7
     - g++-7
+    - libavcodec-dev
+    - libavformat-dev
+    - libswscale-dev
+    - libavutil-dev
+    - libswresample-dev
 
 install:
   # upgrade gcc

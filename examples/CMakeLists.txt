@@ -28,6 +28,13 @@ if (OPENCV_FOUND)
     add_executable(scenecut scenecut.cc)
     target_link_libraries(scenecut h264)
     target_link_libraries(scenecut ${OpenCV_LIBS})
+
+    add_executable(ffmpeg_mv ffmpeg_mv.cc)
+    target_link_libraries(ffmpeg_mv ffmpeg)
+    target_link_libraries(ffmpeg_mv ${OpenCV_LIBS})
+
+    set_source_files_properties(ffmpeg_mv.cc PROPERTIES COMPILE_FLAGS
+            "-Wno-effc++ -Wno-missing-field-initializers")
 else()
     MESSAGE(WARNING
             "OpenCV not found. executables will not be built")

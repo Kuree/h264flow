@@ -646,5 +646,7 @@ std::vector<bool> index_scene_cut(h264 &decoder, float threshold) {
     if (counter != total_frames)
         throw std::runtime_error("incorrect state in scene cut calculation");
 
+    /* first frame is not a cut */
+    second_pass_result[0] = false;
     return second_pass_result;
 }
