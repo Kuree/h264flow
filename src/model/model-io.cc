@@ -132,7 +132,68 @@ void load_label(uint32_t label, bool &left, bool &right, bool &up, bool &down,
 }
 
 void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
-             const std::vector<uint8_t> luma, std::string filename) {
+             const std::vector<uint8_t> &luma, std::string filename) {
     std::ofstream stream;
     stream.open(filename.c_str(), std::ios::trunc | std::ios::binary);
+
+    /* version */
+    int const version = 1;
+    auto const height = (uint32_t)mvs.size();
+    auto const width = (uint32_t)mvs[0].size();
+
+    stream.write((char*)(&version), sizeof(version));
+    stream.write((char*)&width, sizeof(width));
+    stream.write((char*)&height, sizeof(height));
+
+    /* mvs first */
+    for (uint32_t i = 0; i < height; i++) {
+        for (uint32_t j = 0; j < width; j++) {
+            stream.write((char*)&mvs[i][j].first, sizeof(int));
+            stream.write((char*)&mvs[i][j].second, sizeof(int));
+        }
+    }
+
+    /* raw luma */
+    const uint8_t * array = &luma[0];
+    stream.write((char *)array, luma.size());
+}
+
+
+std::pair<std::vector<std::vector<std::pair<int, int>>>, std::vector<uint8_t>>
+load_av(const std::string &filename) {
+    if (!file_exists(filename))
+        throw std::runtime_error(filename + " does not exist");
+    std::ifstream stream;
+    stream.open(filename, std::ios::binary);
+
+    uint32_t version = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
+
+    stream.read((char*)&version, sizeof(version));
+    stream.read((char*)&width, sizeof(width));
+    stream.read((char*)&height, sizeof(height));
+
+    if (version != 1)
+        throw std::runtime_error("version should be 1");
+
+    /* mvs first */
+    std::vector<std::vector<std::pair<int, int>>> mvs =
+            std::vector<std::vector<std::pair<int, int>>>(
+                    height, std::vector<std::pair<int, int>>(width));
+    for (uint32_t i = 0; i < height; i++) {
+        for (uint32_t j = 0; j < width; j++) {
+            int x;
+            int y;
+            stream.read((char*)&x, sizeof(int));
+            stream.read((char*)&y, sizeof(int));
+            mvs[i][j].first = x;
+            mvs[i][j].second = y;
+        }
+    }
+
+
+    std::vector<uint8_t> luma = std::vector<uint8_t>(width * height);
+    stream.read((char*)&luma[0], width * height);
+    return std::pair(mvs, luma);
 }

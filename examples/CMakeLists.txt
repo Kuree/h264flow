@@ -32,6 +32,7 @@ if (OPENCV_FOUND)
     add_executable(ffmpeg_mv ffmpeg_mv.cc)
     target_link_libraries(ffmpeg_mv ffmpeg)
     target_link_libraries(ffmpeg_mv ${OpenCV_LIBS})
+    target_link_libraries(ffmpeg_mv h264)
 
     set_source_files_properties(ffmpeg_mv.cc PROPERTIES COMPILE_FLAGS
             "-Wno-effc++ -Wno-missing-field-initializers")

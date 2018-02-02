@@ -14,9 +14,11 @@
     along with h264flow.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+#include <opencv2/opencv.hpp>
 #include "../ffmpeg/libavflow.hh"
 #include "../src/util/argparser.hh"
-#include <opencv2/opencv.hpp>
+#include "../src/model/model-io.hh"
 
 using namespace std;
 using namespace cv;
@@ -85,18 +87,54 @@ std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy)
     return make_tuple(colors[0], colors[1], colors[2]);
 }
 
+void draw_mv(const string &output_file, bool write_video, bool has_initialized,
+             VideoWriter &writer, const vector<vector<pair<int, int>>> &result) {
+    auto frame_height = (int) result.size();
+    auto frame_width = (int) result[0].size();
+    if (!has_initialized && write_video) {
+        writer = VideoWriter(output_file, 0x21, 24,
+                             Size(frame_width, frame_height));
+        has_initialized = true;
+    }
+    /* compute max and min */
+    double max_rad = -1;
+    for (int i = 0; i < frame_height; i++) {
+        for (int j = 0; j < frame_width; j++) {
+            double fx = result[i][j].first;
+            double fy = result[i][j].second;
+            double rad = sqrt(fx * fx + fy * fy);
+            max_rad = max<double>(rad, max_rad);
+        }
+    }
+    if (max_rad == 0) max_rad = 1;
 
+    Mat mat(frame_height, frame_width, CV_8UC3);
+    for (int i = 0; i < frame_height; i++) {
+        for (int j = 0; j < frame_width; j++) {
+            auto color = compute_color(result[i][j].first / max_rad,
+                                       result[i][j].second / max_rad);
+            mat.at<Vec3b>(i, j) = {get<2>(color), get<1>(color),
+                                   get<0>(color)};
+        }
+    }
+    writer.write(mat);
+}
 
 int main(int argc, char * argv[]) {
     ArgParser parser("Read motion vectors from a media file and visualize");
     parser.add_arg("-i", "input", "media file input");
-    parser.add_arg("-o", "output", "output mv video file");
+    parser.add_arg("-o", "output", "output folder for raw data");
+    parser.add_arg("-v", "visualize", "output visualized video file", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
 
     string filename = arg_values["input"];
-    string output_file = arg_values["output"];
+    string output_dir = arg_values["output"];
+    string output_file;
+    if (arg_values.find("visualize") != arg_values.end())
+        output_file = arg_values["visualize"];
+    bool write_video = !output_file.empty();
 
     Mat frame;
     bool has_initialized = false;
@@ -104,38 +142,25 @@ int main(int argc, char * argv[]) {
 
     LibAvFlow flow(filename);
     while (true) {
-        auto result = flow.get_mv();
-        if (result.empty())
+        auto mvs = flow.get_mv();
+        if (mvs.empty())
             break;
-        auto frame_height = (int)result.size();
-        auto frame_width = (int)result[0].size();
-        if (!has_initialized) {
-            writer = VideoWriter(output_file, 0x21, 24, Size(frame_width, frame_height));
-            has_initialized = true;
-        }
-        /* compute max and min */
-        double max_rad = -1;
-        for (int i = 0; i < frame_height; i++) {
-            for (int j = 0; j < frame_width; j++) {
-                double fx = result[i][j].first;
-                double fy = result[i][j].second;
-                double rad = sqrt(fx * fx + fy * fy);
-                max_rad = max<double>(rad, max_rad);
-            }
-        }
-        if (max_rad == 0) max_rad = 1;
 
-        Mat mat(frame_height, frame_width, CV_8UC3);
-        for (int i = 0; i < frame_height; i++) {
-            for (int j = 0; j < frame_width; j++) {
-                auto color = compute_color(result[i][j].first / max_rad,
-                                           result[i][j].second / max_rad);
-                mat.at<Vec3b>(i, j) = {get<2>(color), get<1>(color), get<0>(color)};
-            }
+        if (write_video) {
+            draw_mv(output_file, write_video, has_initialized, writer,
+                             mvs);
         }
-        writer.write(mat);
+
+        /* get raw frame*/
+        auto luma = flow.get_luma();
+        if (flow.current_frame_num() > 10000)
+            break;
+        char buf[120];
+        std::snprintf(buf, 120, "%s/frame_%04d", output_dir.c_str(), flow.current_frame_num());
+        dump_av(mvs, luma, buf);
     }
-    writer.release();
+    if (write_video)
+        writer.release();
 
     return EXIT_SUCCESS;
 }

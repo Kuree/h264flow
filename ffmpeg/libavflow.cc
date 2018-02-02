@@ -170,5 +170,5 @@ std::vector<uint8_t> LibAvFlow::get_luma() {
     int line_size = frame->linesize[0];
     if (width != line_size)
         throw std::runtime_error("line size does not equal to width");
-    return std::vector<uint8_t>(frame->data, frame->data + width * height);
+    return std::vector<uint8_t>(frame->data[0], frame->data[0] + width * height);
 }

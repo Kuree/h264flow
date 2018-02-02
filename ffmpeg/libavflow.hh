@@ -34,7 +34,7 @@ public:
     /* return in raster order. has be called after MV is obtained */
     /* TODO: fix this */
     std::vector<uint8_t > get_luma();
-
+    int current_frame_num() const { return video_frame_count; }
     ~LibAvFlow();
 
 private:
