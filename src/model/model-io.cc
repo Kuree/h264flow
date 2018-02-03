@@ -196,3 +196,38 @@ load_av(const std::string &filename) {
     stream.read((char*)&luma[0], width * height);
     return std::pair(mvs, luma);
 }
+
+
+std::vector<std::vector<std::pair<float, float>>>
+load_sintel_flo(const std::string &filename) {
+    if (!file_exists(filename))
+        throw std::runtime_error(filename + " does not exist");
+    std::ifstream stream;
+    stream.open(filename, std::ios::binary);
+
+    float tag;
+    stream.read((char*)&tag, sizeof(tag));
+    if (tag != 202021.25)
+        throw std::runtime_error("the machine is not little endian");
+
+    int width, height;
+    stream.read((char*)&width, sizeof(width));
+    stream.read((char*)&height, sizeof(height));
+
+    if (width < 1 || width > 99999)
+        throw std::runtime_error("illegal width");
+    if (height < 1 || height > 99999)
+        throw std::runtime_error("illegal height");
+
+    std::vector<std::vector<std::pair<float, float>>> result =
+            std::vector<std::vector<std::pair<float, float>>>
+                    ((uint32_t)height,
+                     std::vector<std::pair<float, float>>((uint32_t)width));
+
+    /* raster scan */
+    for (int i = 0; i < height; i++) {
+        auto row = result[i].data();
+        stream.read((char*)row, width * 2 * sizeof(float));
+    }
+    return result;
+}

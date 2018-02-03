@@ -40,4 +40,10 @@ void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
 
 std::pair<std::vector<std::vector<std::pair<int, int>>>, std::vector<uint8_t>>
 load_av(const std::string &filename);
+
+
+/* this is for Sintel MPI */
+std::vector<std::vector<std::pair<float, float>>>
+load_sintel_flo(const std::string &filename);
+
 #endif //H264FLOW_MODEL_IO_HH

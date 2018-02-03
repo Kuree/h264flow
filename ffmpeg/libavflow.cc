@@ -89,11 +89,19 @@ void LibAvFlow::decode_pkt(const AVPacket *pkt) {
                     AVMotionVector amv = mvs[i];
                     int mv_x = amv.dst_x - amv.src_x;
                     int mv_y = amv.dst_y - amv.src_y;
+                    if (amv.source > 0) {
+                        mv_x = -mv_x;
+                        mv_y = -mv_y;
+                    }
                     /* fill in the motion vectors */
                     for (int y = 0; y < amv.h; y++) {
                         for (int x = 0; x < amv.w; x++) {
-                            mv_data_[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].first = mv_x;
-                            mv_data_[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].second = mv_y;
+                            int px = x + amv.src_x - amv.w / 2;
+                            int py = y + amv.src_y - amv.h / 2;
+                            if (px < 0 || py < 0 || px >= width || py >= height)
+                                continue;
+                            mv_data_[py][px].first = mv_x;
+                            mv_data_[py][px].second = mv_y;
                         }
                     }
                 }

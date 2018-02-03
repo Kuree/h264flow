@@ -19,6 +19,7 @@
 #include "../ffmpeg/libavflow.hh"
 #include "../src/util/argparser.hh"
 #include "../src/model/model-io.hh"
+#include "../src/util/filesystem.hh"
 
 using namespace std;
 using namespace cv;
@@ -136,6 +137,9 @@ int main(int argc, char * argv[]) {
         output_file = arg_values["visualize"];
     bool write_video = !output_file.empty();
 
+    if (!dir_exists(output_dir))
+        throw std::runtime_error(output_dir + " does not exist");
+
     Mat frame;
     bool has_initialized = false;
     VideoWriter writer;
@@ -157,7 +161,7 @@ int main(int argc, char * argv[]) {
         if (flow.current_frame_num() > 10000)
             break;
         char buf[120];
-        std::snprintf(buf, 120, "%s/frame_%04d.frame", output_dir.c_str(), flow.current_frame_num());
+        std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(), flow.current_frame_num());
         dump_av(mvs, luma, buf);
     }
     if (write_video)

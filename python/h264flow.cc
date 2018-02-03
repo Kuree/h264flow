@@ -123,6 +123,7 @@ void init_model(py::module &m) {
 void init_ffmpeg(py::module &m) {
     m.def("dump_av", &dump_av);
     m.def("load_av", &load_av);
+    m.def("load_sintel_flo", &load_sintel_flo);
 }
 
 #ifdef OPENCV_ENABLED
