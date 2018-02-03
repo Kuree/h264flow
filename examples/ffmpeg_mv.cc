@@ -88,15 +88,10 @@ std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy)
     return make_tuple(colors[0], colors[1], colors[2]);
 }
 
-void draw_mv(const string &output_file, bool write_video, bool has_initialized,
-             VideoWriter &writer, const vector<vector<pair<int, int>>> &result) {
+void draw_mv(VideoWriter &writer,
+             const vector<vector<pair<int, int>>> &result) {
     auto frame_height = (int) result.size();
     auto frame_width = (int) result[0].size();
-    if (!has_initialized && write_video) {
-        writer = VideoWriter(output_file, 0x21, 24,
-                             Size(frame_width, frame_height));
-        has_initialized = true;
-    }
     /* compute max and min */
     double max_rad = -1;
     for (int i = 0; i < frame_height; i++) {
@@ -119,50 +114,73 @@ void draw_mv(const string &output_file, bool write_video, bool has_initialized,
         }
     }
     writer.write(mat);
+    waitKey(10);
 }
 
 int main(int argc, char * argv[]) {
     ArgParser parser("Read motion vectors from a media file and visualize");
     parser.add_arg("-i", "input", "media file input");
-    parser.add_arg("-o", "output", "output folder for raw data");
-    parser.add_arg("-v", "visualize", "output visualized video file", false);
+    parser.add_arg("-o", "output", "output folder for raw data", false);
+    parser.add_arg("-v", "visualize", "output visualized video file. "
+            "if present, it will disable raw data dump", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
 
     string filename = arg_values["input"];
-    string output_dir = arg_values["output"];
+    string output_dir;
+    if (arg_values.find("output") != arg_values.end()) {
+        output_dir = arg_values["output"];
+        if (!dir_exists(output_dir))
+            throw std::runtime_error(output_dir + " does not exist");
+    }
     string output_file;
     if (arg_values.find("visualize") != arg_values.end())
         output_file = arg_values["visualize"];
-    bool write_video = !output_file.empty();
+    bool write_video = false;
+    bool dump_mv = true;
+    if (!output_file.empty()) {
+        dump_mv = false;
+        write_video = true;
+    }
 
-    if (!dir_exists(output_dir))
-        throw std::runtime_error(output_dir + " does not exist");
+    if (!write_video && !dump_mv) {
+        parser.print_help(argv[0]);
+        return EXIT_FAILURE;
+    }
+
 
     Mat frame;
     bool has_initialized = false;
     VideoWriter writer;
 
     LibAvFlow flow(filename);
-    while (true) {
+    while (flow.current_frame_num() < flow.total_frames()) {
         /* get raw frame*/
-        flow.decode_frame();
-
-        auto mvs = flow.get_mv();
-        if (mvs.empty())
+        if (!flow.decode_frame())
             break;
+        auto mvs = flow.get_mv();
+        uint32_t frame_height = mvs.size();
+        uint32_t frame_width = (uint32_t)mvs[0].size();
+
+        if (!has_initialized && write_video) {
+            writer = VideoWriter(output_file, 0x21, 24,
+                                 Size(frame_width, frame_height));
+            has_initialized = true;
+        }
 
         if (write_video) {
-            draw_mv(output_file, write_video, has_initialized, writer,
-                    mvs);
+            draw_mv(writer, mvs);
         }
-        auto luma = flow.get_luma();
-        if (flow.current_frame_num() > 10000)
-            break;
-        char buf[120];
-        std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(), flow.current_frame_num());
-        dump_av(mvs, luma, buf);
+        if (dump_mv) {
+            auto luma = flow.get_luma();
+            if (flow.current_frame_num() > 10000)
+                break;
+            char buf[120];
+            std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(),
+                          flow.current_frame_num());
+            dump_av(mvs, luma, buf);
+        }
     }
     if (write_video)
         writer.release();

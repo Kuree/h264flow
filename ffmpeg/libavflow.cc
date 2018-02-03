@@ -129,6 +129,8 @@ void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
         int stream_idx = ret;
         st = fmt_ctx->streams[stream_idx];
 
+        total_frames_ = st->nb_frames;
+
         dec_ctx = avcodec_alloc_context3(dec);
         if (!dec_ctx) {
             fprintf(stderr, "Failed to allocate codec\n");
@@ -162,7 +164,7 @@ LibAvFlow::~LibAvFlow() {
     clean_up();
 }
 
-void LibAvFlow::decode_frame() {
+bool LibAvFlow::decode_frame() {
     AVPacket pkt = {nullptr};
     std::vector<std::vector<std::pair<int, int>>> result;
     int old_frame_num = video_frame_count;
@@ -171,7 +173,8 @@ void LibAvFlow::decode_frame() {
             decode_pkt(&pkt);
             av_packet_unref(&pkt);
             if (old_frame_num != video_frame_count)
-                break;
+                return true;
         }
     }
+    return false;
 }

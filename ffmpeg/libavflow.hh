@@ -36,7 +36,8 @@ public:
     int current_frame_num() const { return video_frame_count; }
     ~LibAvFlow();
     /* this one has to be called first */
-    void decode_frame();
+    bool decode_frame();
+    inline int64_t total_frames() const { return total_frames_; }
 
 private:
     AVFormatContext *fmt_ctx = nullptr;
@@ -44,11 +45,13 @@ private:
     AVStream *video_stream = nullptr;
 
     int video_stream_idx = -1;
-    AVFrame *frame = NULL;
+    AVFrame *frame = nullptr;
     int video_frame_count = 0;
 
     int height = 0;
     int width = 0;
+
+    int64_t total_frames_ = 0;
 
     void clean_up();
 
