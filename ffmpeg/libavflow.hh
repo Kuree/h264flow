@@ -38,6 +38,8 @@ public:
     /* this one has to be called first */
     bool decode_frame();
     inline int64_t total_frames() const { return total_frames_; }
+    inline int width() { return width_; }
+    inline int height() { return height_; }
 
 private:
     AVFormatContext *fmt_ctx = nullptr;
@@ -48,10 +50,11 @@ private:
     AVFrame *frame = nullptr;
     int video_frame_count = 0;
 
-    int height = 0;
-    int width = 0;
+    int height_ = 0;
+    int width_ = 0;
 
     int64_t total_frames_ = 0;
+    bool cached_state_ = false;
 
     void clean_up();
 

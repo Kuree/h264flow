@@ -52,9 +52,13 @@ LibAvFlow::LibAvFlow(const std::string &filename) {
 }
 
 void LibAvFlow::decode_pkt(const AVPacket *pkt) {
-    int ret = avcodec_send_packet(video_dec_ctx, pkt);
-    if (ret < 0)
-        throw std::runtime_error("Error while sending a packet to the decoder");
+    int ret = 0;
+    if (!cached_state_) {
+        ret = avcodec_send_packet(video_dec_ctx, pkt);
+        if (ret < 0)
+            throw std::runtime_error(
+                    "Error while sending a packet to the decoder");
+    }
     while (ret >= 0)  {
         ret = avcodec_receive_frame(video_dec_ctx, frame);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -67,18 +71,16 @@ void LibAvFlow::decode_pkt(const AVPacket *pkt) {
         if (ret >= 0) {
             AVFrameSideData *sd;
             video_frame_count++;
-            height = static_cast<uint32_t>(frame->height);
-            width = static_cast<uint32_t>(frame->width);
-            mv_data_ = std::vector<std::vector<std::pair<int, int>>>(height,
-                    std::vector<std::pair<int, int>>(width));
+            mv_data_ = std::vector<std::vector<std::pair<int, int>>>(height_,
+                    std::vector<std::pair<int, int>>(width_));
 
 
             int line_size = frame->linesize[0];
-            luma_data_ =  std::vector<uint8_t>(width * height);
-            for (int i = 0; i < height; i++) {
-                uint8_t * dst_data = luma_data_.data() + i * width;
+            luma_data_ =  std::vector<uint8_t>(width_ * height_);
+            for (int i = 0; i < height_; i++) {
+                uint8_t * dst_data = luma_data_.data() + i * width_;
                 uint8_t * src_data = frame->data[0] + i * line_size;
-                memcpy(dst_data, src_data, width);
+                memcpy(dst_data, src_data, width_);
             }
 
             sd = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
@@ -98,15 +100,18 @@ void LibAvFlow::decode_pkt(const AVPacket *pkt) {
                         for (int x = 0; x < amv.w; x++) {
                             int px = x + amv.src_x - amv.w / 2;
                             int py = y + amv.src_y - amv.h / 2;
-                            if (px < 0 || py < 0 || px >= width || py >= height)
+                            if (px < 0 || py < 0 || px >= width_ || py >= height_)
                                 continue;
                             mv_data_[py][px].first = mv_x;
                             mv_data_[py][px].second = mv_y;
                         }
                     }
                 }
+            } else {
+                /* no motion vector data */
+                mv_data_ = std::vector<std::vector<std::pair<int, int>>>();
             }
-            av_frame_unref(frame);
+            break;
         } else {
             throw std::runtime_error("wrong ret");
         }
@@ -123,8 +128,7 @@ void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
 
     ret = av_find_best_stream(fmt_ctx, type, -1, -1, &dec, 0);
     if (ret < 0) {
-        fprintf(stderr, "Could not find %s stream in input file",
-                av_get_media_type_string(type));
+        throw std::runtime_error("Could not find %s stream in input file");
     } else {
         int stream_idx = ret;
         st = fmt_ctx->streams[stream_idx];
@@ -138,7 +142,7 @@ void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
 
         ret = avcodec_parameters_to_context(dec_ctx, st->codecpar);
         if (ret < 0) {
-            fprintf(stderr, "Failed to copy codec parameters to codec context\n");
+            throw std::runtime_error("Failed to copy codec parameters to codec context");
         }
 
         /* Init the video decoder */
@@ -151,6 +155,8 @@ void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
         video_stream_idx = stream_idx;
         video_stream = fmt_ctx->streams[video_stream_idx];
         video_dec_ctx = dec_ctx;
+        height_ = dec_ctx->height;
+        width_ = dec_ctx->width;
     }
 }
 
@@ -168,13 +174,22 @@ bool LibAvFlow::decode_frame() {
     AVPacket pkt = {nullptr};
     std::vector<std::vector<std::pair<int, int>>> result;
     int old_frame_num = video_frame_count;
-    while (av_read_frame(fmt_ctx, &pkt) >= 0) {
-        if (pkt.stream_index == video_stream_idx) {
-            decode_pkt(&pkt);
-            av_packet_unref(&pkt);
-            if (old_frame_num != video_frame_count)
-                return true;
+    if (!cached_state_) {
+        while (av_read_frame(fmt_ctx, &pkt) >= 0) {
+            if (pkt.stream_index == video_stream_idx) {
+                decode_pkt(&pkt);
+                av_packet_unref(&pkt);
+                if (old_frame_num != video_frame_count)
+                    return true;
+            }
         }
     }
+    /* try to flush cached frames */
+    pkt.data = NULL;
+    pkt.size = 0;
+    decode_pkt(&pkt);
+    cached_state_ = true;
+    if (old_frame_num != video_frame_count)
+        return true;
     return false;
 }

@@ -151,23 +151,20 @@ int main(int argc, char * argv[]) {
 
 
     Mat frame;
-    bool has_initialized = false;
     VideoWriter writer;
-
     LibAvFlow flow(filename);
+
+    if (write_video)
+        writer = VideoWriter(output_file, 0x21, 25, Size(flow.width(),
+                                                         flow.height()));
+
     while (flow.current_frame_num() < flow.total_frames()) {
         /* get raw frame*/
         if (!flow.decode_frame())
             break;
         auto mvs = flow.get_mv();
-        uint32_t frame_height = mvs.size();
-        uint32_t frame_width = (uint32_t)mvs[0].size();
-
-        if (!has_initialized && write_video) {
-            writer = VideoWriter(output_file, 0x21, 24,
-                                 Size(frame_width, frame_height));
-            has_initialized = true;
-        }
+        if (mvs.empty())
+            continue;
 
         if (write_video) {
             draw_mv(writer, mvs);
