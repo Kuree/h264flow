@@ -30,12 +30,13 @@ class LibAvFlow {
 public:
     explicit LibAvFlow(const std::string &filename);
 
-    std::vector<std::vector<std::pair<int, int>>> get_mv();
-    /* return in raster order. has be called after MV is obtained */
-    /* TODO: fix this */
-    std::vector<uint8_t > get_luma();
+    inline std::vector<std::vector<std::pair<int, int>>> get_mv() const
+    { return mv_data_; }
+    inline std::vector<uint8_t > get_luma() const { return luma_data_; }
     int current_frame_num() const { return video_frame_count; }
     ~LibAvFlow();
+    /* this one has to be called first */
+    void decode_frame();
 
 private:
     AVFormatContext *fmt_ctx = nullptr;
@@ -53,9 +54,10 @@ private:
 
     void open_codec_context(AVFormatContext *fmt_ctx, enum AVMediaType type);
 
-    std::vector<std::vector<std::pair<int, int>>>
-    decode_pkt(const AVPacket *pkt);
+    void decode_pkt(const AVPacket *pkt);
 
+    std::vector<uint8_t> luma_data_;
+    std::vector<std::vector<std::pair<int, int>>> mv_data_;
 };
 
 

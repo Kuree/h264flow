@@ -45,8 +45,8 @@ void init_mv_frame(py::module &m) {
                 for (uint32_t i = 0; i < mv.height() / 16; i++) {
                     auto row = mv[i];
                     auto row_list = py::list();
-                    for (uint32_t j = 0; j < row.size(); j++)
-                        row_list.append(py::array(2, row[j].mvL0));
+                    for (auto &j : row)
+                        row_list.append(py::array(2, j.mvL0));
                     lst.append(row_list);
                 }
                 return py::array(lst);
@@ -120,6 +120,11 @@ void init_model(py::module &m) {
     });
 }
 
+void init_ffmpeg(py::module &m) {
+    m.def("dump_av", &dump_av);
+    m.def("load_av", &load_av);
+}
+
 #ifdef OPENCV_ENABLED
 using ShapeContainer = py::detail::any_container<ssize_t>;
 void init_opencv(py::module &m) {
@@ -140,6 +145,7 @@ PYBIND11_PLUGIN(h264flow) {
     init_mv(m);
     init_op(m);
     init_model(m);
+    init_ffmpeg(m);
 #ifdef OPENCV_ENABLED
     init_model(m);
 #endif

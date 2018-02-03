@@ -51,12 +51,10 @@ LibAvFlow::LibAvFlow(const std::string &filename) {
     }
 }
 
-std::vector<std::vector<std::pair<int, int>>>
-LibAvFlow::decode_pkt(const AVPacket *pkt) {
+void LibAvFlow::decode_pkt(const AVPacket *pkt) {
     int ret = avcodec_send_packet(video_dec_ctx, pkt);
     if (ret < 0)
         throw std::runtime_error("Error while sending a packet to the decoder");
-    std::vector<std::vector<std::pair<int, int>>> result;
     while (ret >= 0)  {
         ret = avcodec_receive_frame(video_dec_ctx, frame);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
@@ -71,8 +69,17 @@ LibAvFlow::decode_pkt(const AVPacket *pkt) {
             video_frame_count++;
             height = static_cast<uint32_t>(frame->height);
             width = static_cast<uint32_t>(frame->width);
-            result = std::vector<std::vector<std::pair<int, int>>>(height,
+            mv_data_ = std::vector<std::vector<std::pair<int, int>>>(height,
                     std::vector<std::pair<int, int>>(width));
+
+
+            int line_size = frame->linesize[0];
+            luma_data_ =  std::vector<uint8_t>(width * height);
+            for (int i = 0; i < height; i++) {
+                uint8_t * dst_data = luma_data_.data() + i * width;
+                uint8_t * src_data = frame->data[0] + i * line_size;
+                memcpy(dst_data, src_data, width);
+            }
 
             sd = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
             if (sd) {
@@ -85,8 +92,8 @@ LibAvFlow::decode_pkt(const AVPacket *pkt) {
                     /* fill in the motion vectors */
                     for (int y = 0; y < amv.h; y++) {
                         for (int x = 0; x < amv.w; x++) {
-                            result[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].first = mv_x;
-                            result[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].second = mv_y;
+                            mv_data_[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].first = mv_x;
+                            mv_data_[y + amv.dst_y - amv.h / 2][x + amv.dst_x - amv.w / 2].second = mv_y;
                         }
                     }
                 }
@@ -96,7 +103,6 @@ LibAvFlow::decode_pkt(const AVPacket *pkt) {
             throw std::runtime_error("wrong ret");
         }
     }
-    return result;
 }
 
 void LibAvFlow::open_codec_context(AVFormatContext *fmt_ctx,
@@ -148,27 +154,16 @@ LibAvFlow::~LibAvFlow() {
     clean_up();
 }
 
-std::vector<std::vector<std::pair<int, int>>> LibAvFlow::get_mv() {
+void LibAvFlow::decode_frame() {
     AVPacket pkt = {nullptr};
     std::vector<std::vector<std::pair<int, int>>> result;
     int old_frame_num = video_frame_count;
     while (av_read_frame(fmt_ctx, &pkt) >= 0) {
         if (pkt.stream_index == video_stream_idx) {
-            result = decode_pkt(&pkt);
+            decode_pkt(&pkt);
             av_packet_unref(&pkt);
             if (old_frame_num != video_frame_count)
                 break;
         }
     }
-    return result;
-}
-
-std::vector<uint8_t> LibAvFlow::get_luma() {
-    if (!frame) {
-        return std::vector<uint8_t>();
-    }
-    int line_size = frame->linesize[0];
-    if (width != line_size)
-        throw std::runtime_error("line size does not equal to width");
-    return std::vector<uint8_t>(frame->data[0], frame->data[0] + width * height);
 }

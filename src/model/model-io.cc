@@ -192,7 +192,6 @@ load_av(const std::string &filename) {
         }
     }
 
-
     std::vector<uint8_t> luma = std::vector<uint8_t>(width * height);
     stream.read((char*)&luma[0], width * height);
     return std::pair(mvs, luma);

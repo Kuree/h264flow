@@ -142,21 +142,22 @@ int main(int argc, char * argv[]) {
 
     LibAvFlow flow(filename);
     while (true) {
+        /* get raw frame*/
+        flow.decode_frame();
+
         auto mvs = flow.get_mv();
         if (mvs.empty())
             break;
 
         if (write_video) {
             draw_mv(output_file, write_video, has_initialized, writer,
-                             mvs);
+                    mvs);
         }
-
-        /* get raw frame*/
         auto luma = flow.get_luma();
         if (flow.current_frame_num() > 10000)
             break;
         char buf[120];
-        std::snprintf(buf, 120, "%s/frame_%04d", output_dir.c_str(), flow.current_frame_num());
+        std::snprintf(buf, 120, "%s/frame_%04d.frame", output_dir.c_str(), flow.current_frame_num());
         dump_av(mvs, luma, buf);
     }
     if (write_video)
