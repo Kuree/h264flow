@@ -7,6 +7,7 @@ addons:
     sources:
     - ubuntu-toolchain-r-test
     - sourceline: 'ppa:jonathonf/ffmpeg-3'
+    - sourceline: 'ppa:lkoppel/opencv'
     packages:
     - gcc-7
     - g++-7
@@ -15,6 +16,7 @@ addons:
     - libswscale-dev
     - libavutil-dev
     - libswresample-dev
+    - libopencv-dev
 
 install:
   # upgrade gcc
@@ -26,14 +28,6 @@ before_install:
   - sudo apt-get update -q
   - git submodule update --init --recursive
   - pyenv global system 3.6
-  - git clone https://github.com/opencv/opencv
-  - cd opencv
-  - mkdir build
-  - cd build
-  - cmake .. -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_PERF_TESTS=OFF
-  - make -j4
-  - sudo make -j4 install
-  - cd ../..
 
 script:
   - git clone --depth 1 https://github.com/pybind/pybind11
