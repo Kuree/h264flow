@@ -18,8 +18,8 @@ if (OPENCV_FOUND)
     add_definitions(-DOPENCV_ENABLED)
 endif()
 
-find_package(FFmpeg)
-
+find_package(FFmpeg REQUIRED)
+find_package(PythonLibs REQUIRED)
 
 add_subdirectory(python/pybind11)
 

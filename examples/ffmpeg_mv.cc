@@ -24,72 +24,9 @@
 using namespace std;
 using namespace cv;
 
-/* taken from MPI Sintel */
 
-int ncols = 0;
-#define MAXCOLS 60
-int colorwheel[MAXCOLS][3];
-
-void set_cols(int r, int g, int b, int k)
-{
-    colorwheel[k][0] = r;
-    colorwheel[k][1] = g;
-    colorwheel[k][2] = b;
-}
-
-void make_color_wheel()
-{
-    // relative lengths of color transitions:
-    // these are chosen based on perceptual similarity
-    // (e.g. one can distinguish more shades between red and yellow
-    //  than between yellow and green)
-    int RY = 15;
-    int YG = 6;
-    int GC = 4;
-    int CB = 11;
-    int BM = 13;
-    int MR = 6;
-    ncols = RY + YG + GC + CB + BM + MR;
-    //printf("ncols = %d\n", ncols);
-    if (ncols > MAXCOLS)
-        exit(1);
-    int i;
-    int k = 0;
-    for (i = 0; i < RY; i++) set_cols(255, 255 * i / RY, 0, k++);
-    for (i = 0; i < YG; i++) set_cols(255 - 255 * i / YG, 255, 0, k++);
-    for (i = 0; i < GC; i++) set_cols(0, 255, 255 * i / GC, k++);
-    for (i = 0; i < CB; i++) set_cols(0, 255 - 255 * i / CB, 255, k++);
-    for (i = 0; i < BM; i++) set_cols(255 * i / BM, 0, 255, k++);
-    for (i = 0; i < MR; i++) set_cols(255, 0, 255 - 255 * i / MR, k++);
-}
-
-std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy)
-{
-    if (ncols == 0)
-        make_color_wheel();
-
-    double rad = sqrt(fx * fx + fy * fy);
-    double a = atan2(-fy, -fx) / M_PI;
-    double fk = (a + 1.0) / 2.0 * (ncols-1);
-    auto k0 = static_cast<int>(fk);
-    int k1 = (k0 + 1) % ncols;
-    double f = fk - k0;
-    uint8_t colors[3];
-    for (int b = 0; b < 3; b++) {
-        double col0 = colorwheel[k0][b] / 255.0;
-        double col1 = colorwheel[k1][b] / 255.0;
-        double col = (1 - f) * col0 + f * col1;
-        if (rad <= 1)
-            col = 1 - rad * (1 - col); // increase saturation with radius
-        else
-            col *= .75; // out of range
-        colors[2 - b] = static_cast<uint8_t>(255.0 * col);
-    }
-    return make_tuple(colors[0], colors[1], colors[2]);
-}
-
-void draw_mv(VideoWriter &writer,
-             const vector<vector<pair<int, int>>> &result) {
+template<typename T>
+Mat draw_mv(const vector<vector<pair<T, T>>> &result) {
     auto frame_height = (int) result.size();
     auto frame_width = (int) result[0].size();
     /* compute max and min */
@@ -113,13 +50,15 @@ void draw_mv(VideoWriter &writer,
                                    get<0>(color)};
         }
     }
-    writer.write(mat);
-    waitKey(10);
+    return mat;
 }
 
 int main(int argc, char * argv[]) {
     ArgParser parser("Read motion vectors from a media file and visualize");
-    parser.add_arg("-i", "input", "media file input");
+    parser.add_arg("-i", "input", "media file input", false);
+    parser.add_arg("-f", "flo", "flow file dir. if present, it will override "
+            "all the other inputs, that is, it will only visualize the flow "
+            "files", false);
     parser.add_arg("-o", "output", "output folder for raw data", false);
     parser.add_arg("-v", "visualize", "output visualized video file. "
             "if present, it will disable raw data dump", false);
@@ -149,38 +88,79 @@ int main(int argc, char * argv[]) {
         return EXIT_FAILURE;
     }
 
+    string flow_dir;
+    bool read_flo_file = false;
+    if (arg_values.find("flo") != arg_values.end()) {
+        flow_dir = arg_values["flo"];
+        dump_mv = false;
+        write_video = false;
+        read_flo_file = true;
+    }
+
 
     Mat frame;
-    VideoWriter writer;
-    LibAvFlow flow(filename);
+    if (!read_flo_file) {
+        VideoWriter writer;
+        LibAvFlow flow(filename);
 
-    if (write_video)
-        writer = VideoWriter(output_file, 0x21, 25, Size(flow.width(),
-                                                         flow.height()));
+        if (write_video)
+            writer = VideoWriter(output_file, 0x21, 25, Size(flow.width(),
+                                                             flow.height()));
 
-    while (flow.current_frame_num() < flow.total_frames()) {
-        /* get raw frame*/
-        if (!flow.decode_frame())
-            break;
-        auto mvs = flow.get_mv();
-        if (mvs.empty())
-            continue;
-
-        if (write_video) {
-            draw_mv(writer, mvs);
-        }
-        if (dump_mv) {
-            auto luma = flow.get_luma();
-            if (flow.current_frame_num() > 10000)
+        while (flow.current_frame_num() < flow.total_frames()) {
+            /* get raw frame*/
+            if (!flow.decode_frame())
                 break;
-            char buf[120];
-            std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(),
-                          flow.current_frame_num());
-            dump_av(mvs, luma, buf);
-        }
-    }
-    if (write_video)
-        writer.release();
+            auto mvs = flow.get_mv();
+            if (mvs.empty())
+                continue;
 
+            if (write_video) {
+                auto mat = draw_mv<int>(mvs);
+                writer.write(mat);
+                waitKey(10);
+            }
+            if (dump_mv) {
+                auto luma = flow.get_luma();
+                if (flow.current_frame_num() > 10000)
+                    break;
+                char buf[120];
+                std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(),
+                              flow.current_frame_num());
+                dump_av(mvs, luma, buf);
+            }
+        }
+        if (write_video)
+            writer.release();
+    } else {
+        /* only visualize the flo file */
+        if (!dir_exists(flow_dir))
+            throw std::runtime_error(flow_dir + " does not exist");
+        auto flo_files = get_files(flow_dir, ".flo");
+        /* frame num comparator */
+        auto cmp = [] (const std::string &entry1, const std::string &entry2) {
+            /* made an assumption about how it's named */
+            std::string name1 = entry1.substr(6, 4);
+            std::string name2 = entry2.substr(6, 4);
+            int num1 = stoi(name1);
+            int num2 = stoi(name2);
+            return num1 < num2;
+        };
+        std::priority_queue<std::string, std::vector<std::string>, decltype(cmp)>
+                queue(cmp);
+        for (auto const & name : flo_files) {
+            queue.push(name);
+        }
+        namedWindow("video");
+        while (!queue.empty()) {
+            std::string name = queue.top();
+            queue.pop();
+            auto mvs = load_sintel_flo(flow_dir + "/" +  name);
+            auto mat = draw_mv<float>(mvs);
+            imshow("video", mat);
+            waitKey(20);
+        }
+
+    }
     return EXIT_SUCCESS;
 }

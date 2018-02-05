@@ -35,8 +35,8 @@ void dump_processed_mv(const MvFrame &frame, uint32_t label,
 std::vector<double> load_processed_mv(const std::string & filename,
                                       uint32_t &label);
 
-void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
-             const std::vector<uint8_t> &luma, std::string filename);
+void dump_av(std::vector<std::vector<std::pair<int, int>>> & mvs,
+             std::vector<uint8_t> &luma, std::string filename);
 
 std::pair<std::vector<std::vector<std::pair<int, int>>>, std::vector<uint8_t>>
 load_av(const std::string &filename);
@@ -45,5 +45,10 @@ load_av(const std::string &filename);
 /* this is for Sintel MPI */
 std::vector<std::vector<std::pair<float, float>>>
 load_sintel_flo(const std::string &filename);
+
+
+#ifdef OPENCV_ENABLED
+std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy);
+#endif
 
 #endif //H264FLOW_MODEL_IO_HH

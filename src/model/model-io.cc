@@ -131,8 +131,8 @@ void load_label(uint32_t label, bool &left, bool &right, bool &up, bool &down,
     zoom_out = (label & 1 << 5) != 0;
 }
 
-void dump_av(const std::vector<std::vector<std::pair<int, int>>> & mvs,
-             const std::vector<uint8_t> &luma, std::string filename) {
+void dump_av(std::vector<std::vector<std::pair<int, int>>> & mvs,
+             std::vector<uint8_t> &luma, std::string filename) {
     std::ofstream stream;
     stream.open(filename.c_str(), std::ios::trunc | std::ios::binary);
 
@@ -231,3 +231,70 @@ load_sintel_flo(const std::string &filename) {
     }
     return result;
 }
+
+
+#ifdef OPENCV_ENABLED
+/* visualize the motion vectors */
+/* taken from MPI Sintel */
+
+int ncols = 0;
+#define MAXCOLS 60
+int colorwheel[MAXCOLS][3];
+
+void set_cols(int r, int g, int b, int k)
+{
+    colorwheel[k][0] = r;
+    colorwheel[k][1] = g;
+    colorwheel[k][2] = b;
+}
+
+void make_color_wheel()
+{
+    // relative lengths of color transitions:
+    // these are chosen based on perceptual similarity
+    // (e.g. one can distinguish more shades between red and yellow
+    //  than between yellow and green)
+    int RY = 15;
+    int YG = 6;
+    int GC = 4;
+    int CB = 11;
+    int BM = 13;
+    int MR = 6;
+    ncols = RY + YG + GC + CB + BM + MR;
+    if (ncols > MAXCOLS)
+        exit(1);
+    int i;
+    int k = 0;
+    for (i = 0; i < RY; i++) set_cols(255, 255 * i / RY, 0, k++);
+    for (i = 0; i < YG; i++) set_cols(255 - 255 * i / YG, 255, 0, k++);
+    for (i = 0; i < GC; i++) set_cols(0, 255, 255 * i / GC, k++);
+    for (i = 0; i < CB; i++) set_cols(0, 255 - 255 * i / CB, 255, k++);
+    for (i = 0; i < BM; i++) set_cols(255 * i / BM, 0, 255, k++);
+    for (i = 0; i < MR; i++) set_cols(255, 0, 255 - 255 * i / MR, k++);
+}
+
+std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy)
+{
+    if (ncols == 0)
+        make_color_wheel();
+
+    double rad = sqrt(fx * fx + fy * fy);
+    double a = atan2(-fy, -fx) / M_PI;
+    double fk = (a + 1.0) / 2.0 * (ncols-1);
+    auto k0 = static_cast<int>(fk);
+    int k1 = (k0 + 1) % ncols;
+    double f = fk - k0;
+    uint8_t colors[3];
+    for (int b = 0; b < 3; b++) {
+        double col0 = colorwheel[k0][b] / 255.0;
+        double col1 = colorwheel[k1][b] / 255.0;
+        double col = (1 - f) * col0 + f * col1;
+        if (rad <= 1)
+            col = 1 - rad * (1 - col); // increase saturation with radius
+        else
+            col *= .75; // out of range
+        colors[2 - b] = static_cast<uint8_t>(255.0 * col);
+    }
+    return std::make_tuple(colors[0], colors[1], colors[2]);
+}
+#endif
