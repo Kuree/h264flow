@@ -135,6 +135,7 @@ void init_opencv(py::module &m) {
                 ShapeContainer shape({mat.rows, mat.cols, mat.channels()});
                 return py::array(shape, mat.data);
             });
+    m.def("load_davis_annotation", &load_davis_annotation);
 }
 
 #endif
@@ -149,6 +150,7 @@ PYBIND11_PLUGIN(h264flow) {
     init_ffmpeg(m);
 #ifdef OPENCV_ENABLED
     init_model(m);
+    init_opencv(m);
 #endif
     return m.ptr();
 }

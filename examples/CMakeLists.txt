@@ -36,6 +36,10 @@ if (OPENCV_FOUND)
 
     set_source_files_properties(ffmpeg_mv.cc PROPERTIES COMPILE_FLAGS
             "-Wno-effc++ -Wno-missing-field-initializers")
+
+    add_executable(davis davis.cc)
+    target_link_libraries(davis h264)
+    target_link_libraries(davis ${OpenCV_LIBS})
 else()
     MESSAGE(WARNING
             "OpenCV not found. executables will not be built")

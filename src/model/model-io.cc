@@ -20,6 +20,10 @@
 #include "../query/operator.hh"
 #include "../util/filesystem.hh"
 
+#ifdef OPENCV_ENABLED
+#include <opencv2/opencv.hpp>
+#endif
+
 void dump_mv(const MvFrame &frame, uint32_t label, std::string filename) {
     if (!frame.p_frame()) return;
     std::ofstream stream;
@@ -296,5 +300,29 @@ std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy)
         colors[2 - b] = static_cast<uint8_t>(255.0 * col);
     }
     return std::make_tuple(colors[0], colors[1], colors[2]);
+}
+
+std::pair<std::vector<std::vector<int>>, std::set<int>>
+load_davis_annotation(const std::string &annotation_file) {
+    if (!file_exists(annotation_file))
+        throw std::runtime_error(annotation_file + " does not exist");
+    cv::Mat image = cv::imread(annotation_file);
+    std::vector<std::vector<int>> result =
+            std::vector<std::vector<int>>(static_cast<uint32_t>(image.rows),
+                                          std::vector<int>(static_cast<uint32_t>
+                                                           (image.cols)));
+    std::set<int> labels;
+    /* access every pixels */
+    for (int i = 0; i < image.rows; i++) {
+        for (int j = 0; j < image.cols; j++) {
+            cv::Vec3b c = image.at<cv::Vec3b>(i, j);
+            /* doesn't matter which order or which type*/
+            int color_index = c[0] << 24 | c[1] << 8 | c[2];
+            result[i][j] = color_index;
+            labels.insert(color_index);
+        }
+    }
+
+    return std::make_pair(result, labels);
 }
 #endif

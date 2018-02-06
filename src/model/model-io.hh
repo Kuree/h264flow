@@ -49,6 +49,10 @@ load_sintel_flo(const std::string &filename);
 
 #ifdef OPENCV_ENABLED
 std::tuple<uint8_t, uint8_t, uint8_t> compute_color(double fx, double fy);
+
+std::pair<std::vector<std::vector<int>>, std::set<int>>
+load_davis_annotation(const std::string &annotation_file);
+
 #endif
 
 #endif //H264FLOW_MODEL_IO_HH

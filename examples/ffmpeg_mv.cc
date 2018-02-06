@@ -146,8 +146,8 @@ int main(int argc, char * argv[]) {
             int num2 = stoi(name2);
             return num1 < num2;
         };
-        std::priority_queue<std::string, std::vector<std::string>, decltype(cmp)>
-                queue(cmp);
+        std::priority_queue<std::string, std::vector<std::string>,
+                decltype(cmp)> queue(cmp);
         for (auto const & name : flo_files) {
             queue.push(name);
         }
@@ -158,7 +158,7 @@ int main(int argc, char * argv[]) {
             auto mvs = load_sintel_flo(flow_dir + "/" +  name);
             auto mat = draw_mv<float>(mvs);
             imshow("video", mat);
-            waitKey(20);
+            waitKey(10);
         }
 
     }
