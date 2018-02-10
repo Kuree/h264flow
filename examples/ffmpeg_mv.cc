@@ -62,6 +62,10 @@ int main(int argc, char * argv[]) {
     parser.add_arg("-o", "output", "output folder for raw data", false);
     parser.add_arg("-v", "visualize", "output visualized video file. "
             "if present, it will disable raw data dump", false);
+    parser.add_arg("-F", "format", "output frame number format. default %04d "
+                   "only used in output mode", false);
+    parser.add_arg("-n", "number", "initial frame number. only be used in "
+                   "output mode. default is 2", false);
     if (!parser.parse(argc, argv))
         return EXIT_FAILURE;
     auto arg_values = parser.get_args();
@@ -87,6 +91,14 @@ int main(int argc, char * argv[]) {
         parser.print_help(argv[0]);
         return EXIT_FAILURE;
     }
+
+    string num_format = "%04d";
+    const int default_num = 2;
+    int frame_num = default_num;
+    if (arg_values.find("format") != arg_values.end())
+        num_format = arg_values["format"];
+    if (arg_values.find("number") != arg_values.end())
+        frame_num = atoi(arg_values["number"].c_str());
 
     string flow_dir;
     bool read_flo_file = false;
@@ -125,8 +137,10 @@ int main(int argc, char * argv[]) {
                 if (flow.current_frame_num() > 10000)
                     break;
                 char buf[120];
-                std::snprintf(buf, 120, "%s/%04d.frame", output_dir.c_str(),
-                              flow.current_frame_num());
+                string name_format = "%s/" + num_format + ".frame";
+                std::snprintf(buf, 120, name_format.c_str(), output_dir.c_str(),
+                              flow.current_frame_num() + frame_num -
+                              default_num);
                 dump_av(mvs, luma, buf);
             }
         }

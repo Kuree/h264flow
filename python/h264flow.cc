@@ -20,6 +20,7 @@
 #include "../src/decoder/h264.hh"
 #include "../src/query/operator.hh"
 #include "../src/model/model-io.hh"
+#include "../ffmpeg/libavflow.hh"
 
 #ifdef OPENCV_ENABLED
 #include "opencvw.hh"
@@ -124,6 +125,14 @@ void init_ffmpeg(py::module &m) {
     m.def("dump_av", &dump_av);
     m.def("load_av", &load_av);
     m.def("load_sintel_flo", &load_sintel_flo);
+    /* low level control */
+    py::class_<LibAvFlow>(m, "LibAvFlow").def(py::init<const std::string&>())
+            .def("get_mv", &LibAvFlow::get_mv)
+            .def("get_mv_bitmap", &LibAvFlow::get_mv_bitmap)
+            .def("decode_frame", &LibAvFlow::decode_frame)
+            .def("current_frame_num", &LibAvFlow::current_frame_num)
+            .def("total_frames", &LibAvFlow::total_frames)
+            .def("get_luma", &LibAvFlow::get_luma);
 }
 
 #ifdef OPENCV_ENABLED

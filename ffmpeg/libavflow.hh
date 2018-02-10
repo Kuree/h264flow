@@ -30,8 +30,8 @@ class LibAvFlow {
 public:
     explicit LibAvFlow(const std::string &filename);
 
-    inline std::vector<std::vector<std::pair<int, int>>> get_mv() const
-    { return mv_data_; }
+    std::vector<std::vector<std::pair<int, int>>> get_mv();
+    std::vector<std::vector<bool>> get_mv_bitmap();
     inline std::vector<uint8_t > get_luma() const { return luma_data_; }
     int current_frame_num() const { return video_frame_count; }
     ~LibAvFlow();
@@ -63,7 +63,7 @@ private:
     void decode_pkt(const AVPacket *pkt);
 
     std::vector<uint8_t> luma_data_;
-    std::vector<std::vector<std::pair<int, int>>> mv_data_;
+    std::vector<AVMotionVector> raw_mv_data;
 };
 
 

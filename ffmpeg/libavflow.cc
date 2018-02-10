@@ -71,9 +71,6 @@ void LibAvFlow::decode_pkt(const AVPacket *pkt) {
         if (ret >= 0) {
             AVFrameSideData *sd;
             video_frame_count++;
-            mv_data_ = std::vector<std::vector<std::pair<int, int>>>(height_,
-                    std::vector<std::pair<int, int>>(width_));
-
 
             int line_size = frame->linesize[0];
             luma_data_ =  std::vector<uint8_t>(width_ * height_);
@@ -87,34 +84,70 @@ void LibAvFlow::decode_pkt(const AVPacket *pkt) {
             if (sd) {
                 auto *mvs = (const AVMotionVector *) sd->data;
                 int num_mvs = sd->size / sizeof(*mvs);
-                for (int i = 0; i < num_mvs; i++) {
-                    AVMotionVector amv = mvs[i];
-                    int mv_x = amv.dst_x - amv.src_x;
-                    int mv_y = amv.dst_y - amv.src_y;
-                    if (amv.source > 0) {
-                        mv_x = -mv_x;
-                        mv_y = -mv_y;
-                    }
-                    /* fill in the motion vectors */
-                    for (int y = 0; y < amv.h; y++) {
-                        for (int x = 0; x < amv.w; x++) {
-                            int px = x + amv.src_x - amv.w / 2;
-                            int py = y + amv.src_y - amv.h / 2;
-                            if (px < 0 || py < 0 || px >= width_ || py >= height_)
-                                continue;
-                            mv_data_[py][px].first = mv_x;
-                            mv_data_[py][px].second = mv_y;
-                        }
-                    }
-                }
+                raw_mv_data = std::vector<AVMotionVector>(mvs, mvs + num_mvs);
             } else {
                 /* no motion vector data */
-                mv_data_ = std::vector<std::vector<std::pair<int, int>>>();
+                raw_mv_data = std::vector<AVMotionVector>();
             }
             break;
         } else {
             throw std::runtime_error("wrong ret");
         }
+    }
+}
+
+std::vector<std::vector<std::pair<int, int>>> LibAvFlow::get_mv() {
+    if (!raw_mv_data.empty()) {
+        auto mv_data = std::vector<std::vector<std::pair<int, int>>>(
+                height_,std::vector<std::pair<int, int>>(width_));
+
+        for (const auto amv : raw_mv_data) {
+            int mv_x = amv.dst_x - amv.src_x;
+            int mv_y = amv.dst_y - amv.src_y;
+            if (amv.source > 0) {
+                mv_x = -mv_x;
+                mv_y = -mv_y;
+            }
+            /* fill in the motion vectors */
+            for (int y = 0; y < amv.h; y++) {
+                for (int x = 0; x < amv.w; x++) {
+                    int px = x + amv.src_x - amv.w / 2;
+                    int py = y + amv.src_y - amv.h / 2;
+                    if (px < 0 || py < 0 || px >= width_ || py >= height_)
+                        continue;
+                    mv_data[py][px].first = mv_x;
+                    mv_data[py][px].second = mv_y;
+                }
+            }
+        }
+        return mv_data;
+    } else {
+        return std::vector<std::vector<std::pair<int, int>>>();
+    }
+}
+
+std::vector<std::vector<bool>> LibAvFlow::get_mv_bitmap() {
+    if (!raw_mv_data.empty()) {
+        /* divided by 4 instead of 8 because in B-frame there can be 4x4
+         * partition */
+        auto result = std::vector<std::vector<bool>>(
+                height_ / 4, std::vector<bool>(width_ / 4, false));
+        for (const auto & amv : raw_mv_data) {
+            int pos_x = amv.source < 0 ? amv.dst_x : amv.src_x;
+            int pos_y = amv.source < 0 ? amv.dst_y : amv.src_y;
+            for (int y = 0; y < amv.h / 4; y++) {
+                for (int x = 0; x < amv.w / 4; x++) {
+                    int px = x + pos_x - amv.w / 2 / 4;
+                    int py = y + pos_y - amv.h / 2 / 4;
+                    if (px < 0 || py < 0 || px > width_ || py > height_)
+                        continue;
+                    result[py][px] = true;
+                }
+            }
+        }
+        return result;
+    } else {
+        return std::vector<std::vector<bool>>();
     }
 }
 
@@ -185,11 +218,9 @@ bool LibAvFlow::decode_frame() {
         }
     }
     /* try to flush cached frames */
-    pkt.data = NULL;
+    pkt.data = nullptr;
     pkt.size = 0;
     decode_pkt(&pkt);
     cached_state_ = true;
-    if (old_frame_num != video_frame_count)
-        return true;
-    return false;
+    return old_frame_num != video_frame_count;
 }
